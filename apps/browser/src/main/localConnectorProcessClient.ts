@@ -4,6 +4,7 @@ import { utilityProcess, type UtilityProcess } from "electron";
 import type {
   AdbWalletCheckResult,
   LocalConnectorHealth,
+  ObjectStorageCheckResult,
   OciCheckConfigResult,
   OracleVectorSearchExecutionPayload,
   OracleVectorSearchExecutionResult,
@@ -43,6 +44,10 @@ export class LocalConnectorProcessClient {
 
   adbWalletCheck(): Promise<AdbWalletCheckResult> {
     return this.request("adbWalletCheck", undefined);
+  }
+
+  objectStorageCheck(): Promise<ObjectStorageCheckResult> {
+    return this.request("objectStorageCheck", undefined);
   }
 
   oracleVectorSearch(payload: OracleVectorSearchExecutionPayload): Promise<OracleVectorSearchExecutionResult> {

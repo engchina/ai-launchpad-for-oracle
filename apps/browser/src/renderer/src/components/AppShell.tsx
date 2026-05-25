@@ -48,6 +48,7 @@ import {
 import type {
   AdbWalletCheckResult,
   LocalConnectorHealth,
+  ObjectStorageCheckResult,
   OciCheckConfigResult,
   OracleVectorSearchExecutionResult,
   SqlclCheckResult
@@ -89,6 +90,7 @@ type LocalConnectorDiagnostic = {
   ociConfig: OciCheckConfigResult;
   sqlcl: SqlclCheckResult;
   adbWallet: AdbWalletCheckResult;
+  objectStorage: ObjectStorageCheckResult;
   checkedAt: string;
 };
 
@@ -478,12 +480,13 @@ export function AppShell(): ReactElement {
   async function handleCheckLocalConnector(): Promise<void> {
     setConnectorCheckState("checking");
     try {
-      const [health, ociConfig, sqlcl, adbWallet] = window.aiLaunchpad
+      const [health, ociConfig, sqlcl, adbWallet, objectStorage] = window.aiLaunchpad
         ? await Promise.all([
             window.aiLaunchpad.localConnector.health(),
             window.aiLaunchpad.localConnector.ociCheckConfig(),
             window.aiLaunchpad.localConnector.sqlclCheck(),
-            window.aiLaunchpad.localConnector.adbWalletCheck()
+            window.aiLaunchpad.localConnector.adbWalletCheck(),
+            window.aiLaunchpad.localConnector.objectStorageCheck()
           ])
         : await Promise.resolve([
             {
@@ -503,7 +506,11 @@ export function AppShell(): ReactElement {
             {
               status: "not-configured",
               message: "renderer preview では ADB wallet を確認しません。"
-            } satisfies AdbWalletCheckResult
+            } satisfies AdbWalletCheckResult,
+            {
+              status: "not-configured",
+              message: "renderer preview では Object Storage を確認しません。"
+            } satisfies ObjectStorageCheckResult
           ] as const);
 
       setConnectorDiagnostic({
@@ -511,6 +518,7 @@ export function AppShell(): ReactElement {
         ociConfig,
         sqlcl,
         adbWallet,
+        objectStorage,
         checkedAt: new Date().toISOString()
       });
     } catch {
@@ -532,6 +540,10 @@ export function AppShell(): ReactElement {
         adbWallet: {
           status: "unavailable",
           message: "ADB wallet check に失敗しました。IPC または connector process を確認してください。"
+        },
+        objectStorage: {
+          status: "unavailable",
+          message: "Object Storage check に失敗しました。IPC または connector process を確認してください。"
         },
         checkedAt: new Date().toISOString()
       });
@@ -1358,6 +1370,7 @@ function OracleVectorConfigPanel({
             <ConnectorDiagnosticRow label="OCI config" value={connectorDiagnostic.ociConfig.status} />
             <ConnectorDiagnosticRow label="SQLcl" value={connectorDiagnostic.sqlcl.status} />
             <ConnectorDiagnosticRow label="ADB wallet" value={connectorDiagnostic.adbWallet.status} />
+            <ConnectorDiagnosticRow label="Object Storage" value={connectorDiagnostic.objectStorage.status} />
             {connectorDiagnostic.ociConfig.profile ? (
               <ConnectorDiagnosticRow label="Profile" value={connectorDiagnostic.ociConfig.profile} />
             ) : null}
@@ -1368,6 +1381,7 @@ function OracleVectorConfigPanel({
           <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.ociConfig.message}</p>
           <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.sqlcl.message}</p>
           <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.adbWallet.message}</p>
+          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.objectStorage.message}</p>
           {connectorDiagnostic.ociConfig.configPath ? (
             <p className="mt-2 break-all text-[11px] leading-5 text-amber-700">config: {connectorDiagnostic.ociConfig.configPath}</p>
           ) : null}

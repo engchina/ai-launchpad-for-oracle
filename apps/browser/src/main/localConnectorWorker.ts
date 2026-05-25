@@ -1,6 +1,7 @@
 import type { LocalConnectorHealth } from "../shared/api";
 import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
 import { checkAdbWallet } from "./adbWalletProbe";
+import { checkObjectStorage } from "./objectStorageProbe";
 import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
 import { checkSqlcl } from "./sqlclProbe";
 import type {
@@ -46,6 +47,10 @@ async function handleRequest<T extends LocalConnectorRequestType>(
 
   if (request.type === "adbWalletCheck") {
     return (await checkAdbWallet()) as LocalConnectorResponsePayloadByType[T];
+  }
+
+  if (request.type === "objectStorageCheck") {
+    return checkObjectStorage() as LocalConnectorResponsePayloadByType[T];
   }
 
   if (request.type === "oracleVectorSearch" && request.payload) {

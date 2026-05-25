@@ -156,6 +156,19 @@ export type AdbWalletCheckResult = {
   }>;
 };
 
+export type ObjectStorageCheckResult = {
+  status: "ready" | "not-configured" | "invalid" | "unavailable";
+  message: string;
+  namespace?: string;
+  bucketName?: string;
+  region?: string;
+  checks?: Array<{
+    name: string;
+    ok: boolean;
+    message: string;
+  }>;
+};
+
 export type AiLaunchpadApi = {
   browserApi: {
     listCaptures: () => Promise<ListCapturesResult>;
@@ -178,6 +191,7 @@ export type AiLaunchpadApi = {
     ociCheckConfig: () => Promise<OciCheckConfigResult>;
     sqlclCheck: () => Promise<SqlclCheckResult>;
     adbWalletCheck: () => Promise<AdbWalletCheckResult>;
+    objectStorageCheck: () => Promise<ObjectStorageCheckResult>;
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) => Promise<OracleVectorSearchExecutionResult>;
   };
 };

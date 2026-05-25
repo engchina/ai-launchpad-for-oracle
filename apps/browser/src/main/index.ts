@@ -156,6 +156,8 @@ app.whenReady().then(() => {
 
   ipcMain.handle("local-connector:adb-wallet-check", () => localConnector.adbWalletCheck());
 
+  ipcMain.handle("local-connector:object-storage-check", () => localConnector.objectStorageCheck());
+
   ipcMain.handle("local-connector:oracle-vector-search", (_, payload: OracleVectorSearchExecutionPayload) =>
     localConnector.oracleVectorSearch(payload)
   );
