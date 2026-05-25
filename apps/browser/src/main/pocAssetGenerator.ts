@@ -59,6 +59,8 @@ function createReadme(config: NormalizedPocAssetConfig): string {
     "- `python/ingest_documents.py`: Object Storage から文書を読み込む Python skeleton",
     "- `terraform/object_storage.tf`: PoC 用 Object Storage bucket の Terraform skeleton",
     "- `checklist.md`: PoC 実行前の readiness と validation checklist",
+    "- `proposal.md`: 顧客説明に使う提案 section の draft",
+    "- `follow_up_email.md`: 次アクション確認用の follow-up email draft",
     "",
     "## Safety",
     "",
@@ -140,6 +142,55 @@ function createTerraform(config: NormalizedPocAssetConfig): string {
   ].join("\n");
 }
 
+function createProposal(config: NormalizedPocAssetConfig): string {
+  return [
+    `# ${config.workspaceName} Proposal Section`,
+    "",
+    "## 提案要旨",
+    "",
+    `${config.playbookTitle} をベースに、${config.useCase} の PoC を短期間で検証します。`,
+    "既存文書や業務ナレッジを Oracle AI Database / OCI AI services に接続し、引用付き回答、検索品質、運用前提を顧客と同じ画面で確認できる状態を目指します。",
+    "",
+    "## 期待効果",
+    "",
+    "- PoC 前提、demo 手順、検証観点を顧客と共有しやすくする",
+    "- Oracle AI Database / OCI の採用判断に必要な technical evidence を早期に揃える",
+    "- 本番化に向けた security、network、data governance の確認事項を明確にする",
+    "",
+    "## 確認が必要な前提",
+    "",
+    `- Target vector table: ${config.dbSchema}.${config.vectorTable}`,
+    `- Object Storage: ${config.objectStorageNamespace}/${config.objectStorageBucket}`,
+    `- Embedding model: ${config.embeddingModel}`,
+    "- 実顧客データを使う場合は、事前に data handling と secret 管理の承認を取得する"
+  ].join("\n");
+}
+
+function createFollowUpEmail(config: NormalizedPocAssetConfig): string {
+  return [
+    `件名: ${config.workspaceName} PoC package の次アクション確認`,
+    "",
+    "お客様各位",
+    "",
+    `本日は ${config.playbookTitle} の PoC 準備についてお時間をいただき、ありがとうございました。`,
+    `${config.useCase} の検証に向け、以下の starter assets を整理しました。`,
+    "",
+    "- README / 提案 section draft",
+    "- SQL、Python、Terraform の template",
+    "- OCI setup と validation checklist",
+    "",
+    "次の確認事項:",
+    "",
+    "1. PoC で扱うデータ範囲と secret / wallet の取り扱い",
+    "2. ADB、Object Storage、IAM policy、network の準備状況",
+    "3. Demo 当日に確認したい質問、成功条件、fallback 方針",
+    "",
+    "上記をご確認いただき、次回までに owner と期限を整理できればと思います。",
+    "",
+    "よろしくお願いいたします。"
+  ].join("\n");
+}
+
 function createChecklist(config: NormalizedPocAssetConfig): string {
   return [
     `# ${config.workspaceName} PoC Checklist`,
@@ -185,6 +236,8 @@ export function generatePocAssets(payload: GeneratePocAssetsPayload = {}): Gener
     warnings: createWarnings(config),
     assets: [
       createAsset("readme", "README.md", "PoC README", createReadme(config)),
+      createAsset("proposal", "proposal.md", "Proposal section draft", createProposal(config)),
+      createAsset("email", "follow_up_email.md", "Follow-up email draft", createFollowUpEmail(config)),
       createAsset("sql", "sql/setup_vector_search.sql", "AI Vector Search SQL", createSql(config)),
       createAsset("python", "python/ingest_documents.py", "Document ingestion Python", createPython(config)),
       createAsset("terraform", "terraform/object_storage.tf", "Object Storage Terraform", createTerraform(config)),

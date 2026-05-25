@@ -101,10 +101,36 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
         content: `# ${workspaceName}\n\n## Playbook\n\n${playbookTitle}\n\n## Safety\n\n- Secret、wallet、private key は含めない`
       },
       {
+        kind: "proposal",
+        fileName: "proposal.md",
+        title: "Proposal section draft",
+        content: `# ${workspaceName} Proposal Section\n\n${playbookTitle} をベースに PoC の提案要旨、期待効果、確認が必要な前提を整理します。`
+      },
+      {
+        kind: "email",
+        fileName: "follow_up_email.md",
+        title: "Follow-up email draft",
+        content: `件名: ${workspaceName} PoC package の次アクション確認\n\n本日は ${playbookTitle} の PoC 準備についてお時間をいただき、ありがとうございました。\n\n次回までに data scope、ADB / Object Storage / IAM readiness、成功条件を確認します。`
+      },
+      {
         kind: "sql",
         fileName: "sql/setup_vector_search.sql",
         title: "AI Vector Search SQL",
         content: "-- AI Vector Search SQL template\nCREATE TABLE AI_LAUNCHPAD_CHUNKS (ID NUMBER, CHUNK_TEXT CLOB, VECTOR_EMBEDDING VECTOR);"
+      },
+      {
+        kind: "python",
+        fileName: "python/ingest_documents.py",
+        title: "Document ingestion Python",
+        content:
+          "def main() -> None:\n    print(\"Prepare document ingestion, chunking, embedding, and DB insert steps.\")\n\n\nif __name__ == \"__main__\":\n    main()"
+      },
+      {
+        kind: "terraform",
+        fileName: "terraform/object_storage.tf",
+        title: "Object Storage Terraform",
+        content:
+          "variable \"compartment_id\" {\n  type = string\n}\n\nresource \"oci_objectstorage_bucket\" \"poc_bucket\" {\n  compartment_id = var.compartment_id\n  name           = \"ai-launchpad-poc\"\n  access_type    = \"NoPublicAccess\"\n}"
       },
       {
         kind: "checklist",
@@ -1330,7 +1356,9 @@ function PocAssetsPanel({
     sql: "SQL",
     python: "Python",
     terraform: "Terraform",
-    checklist: "Checklist"
+    checklist: "Checklist",
+    proposal: "Proposal",
+    email: "Email"
   };
   const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
 
