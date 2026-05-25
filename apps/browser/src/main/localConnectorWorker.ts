@@ -1,8 +1,9 @@
-import type { LocalConnectorHealth } from "../shared/api";
+import type { GeneratePocAssetsPayload, LocalConnectorHealth, OracleVectorSearchExecutionPayload } from "../shared/api";
 import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
 import { checkAdbWallet } from "./adbWalletProbe";
 import { checkObjectStorage } from "./objectStorageProbe";
 import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
+import { generatePocAssets } from "./pocAssetGenerator";
 import { checkSqlcl } from "./sqlclProbe";
 import type {
   LocalConnectorRequest,
@@ -53,8 +54,12 @@ async function handleRequest<T extends LocalConnectorRequestType>(
     return checkObjectStorage() as LocalConnectorResponsePayloadByType[T];
   }
 
+  if (request.type === "generatePocAssets" && request.payload) {
+    return generatePocAssets(request.payload as GeneratePocAssetsPayload) as LocalConnectorResponsePayloadByType[T];
+  }
+
   if (request.type === "oracleVectorSearch" && request.payload) {
-    return executeOracleVectorSearchDryRun(request.payload) as LocalConnectorResponsePayloadByType[T];
+    return executeOracleVectorSearchDryRun(request.payload as OracleVectorSearchExecutionPayload) as LocalConnectorResponsePayloadByType[T];
   }
 
   throw new Error(`Unsupported Local Connector request: ${String(request.type)}`);

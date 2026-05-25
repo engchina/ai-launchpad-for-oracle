@@ -1,6 +1,8 @@
 import type {
   AdbWalletCheckResult,
   LocalConnectorHealth,
+  GeneratePocAssetsPayload,
+  GeneratePocAssetsResult,
   ObjectStorageCheckResult,
   OciCheckConfigResult,
   OracleVectorSearchExecutionPayload,
@@ -14,6 +16,7 @@ export type LocalConnectorRequestPayloadByType = {
   sqlclCheck: undefined;
   adbWalletCheck: undefined;
   objectStorageCheck: undefined;
+  generatePocAssets: GeneratePocAssetsPayload;
   oracleVectorSearch: OracleVectorSearchExecutionPayload;
 };
 
@@ -23,6 +26,7 @@ export type LocalConnectorResponsePayloadByType = {
   sqlclCheck: SqlclCheckResult;
   adbWalletCheck: AdbWalletCheckResult;
   objectStorageCheck: ObjectStorageCheckResult;
+  generatePocAssets: GeneratePocAssetsResult;
   oracleVectorSearch: OracleVectorSearchExecutionResult;
 };
 

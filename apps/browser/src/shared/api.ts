@@ -169,6 +169,35 @@ export type ObjectStorageCheckResult = {
   }>;
 };
 
+export type PocAssetKind = "readme" | "sql" | "python" | "terraform";
+
+export type GeneratePocAssetsPayload = {
+  workspaceName?: string;
+  playbookTitle?: string;
+  useCase?: string;
+  dbSchema?: string;
+  vectorTable?: string;
+  objectStorageNamespace?: string;
+  objectStorageBucket?: string;
+  ociRegion?: string;
+  embeddingModel?: string;
+};
+
+export type GeneratedPocAsset = {
+  kind: PocAssetKind;
+  fileName: string;
+  title: string;
+  content: string;
+};
+
+export type GeneratePocAssetsResult = {
+  status: "generated";
+  message: string;
+  generatedAt: string;
+  assets: GeneratedPocAsset[];
+  warnings: string[];
+};
+
 export type AiLaunchpadApi = {
   browserApi: {
     listCaptures: () => Promise<ListCapturesResult>;
@@ -192,6 +221,7 @@ export type AiLaunchpadApi = {
     sqlclCheck: () => Promise<SqlclCheckResult>;
     adbWalletCheck: () => Promise<AdbWalletCheckResult>;
     objectStorageCheck: () => Promise<ObjectStorageCheckResult>;
+    generatePocAssets: (payload: GeneratePocAssetsPayload) => Promise<GeneratePocAssetsResult>;
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) => Promise<OracleVectorSearchExecutionResult>;
   };
 };

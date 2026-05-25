@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { utilityProcess, type UtilityProcess } from "electron";
 import type {
   AdbWalletCheckResult,
+  GeneratePocAssetsPayload,
+  GeneratePocAssetsResult,
   LocalConnectorHealth,
   ObjectStorageCheckResult,
   OciCheckConfigResult,
@@ -48,6 +50,10 @@ export class LocalConnectorProcessClient {
 
   objectStorageCheck(): Promise<ObjectStorageCheckResult> {
     return this.request("objectStorageCheck", undefined);
+  }
+
+  generatePocAssets(payload: GeneratePocAssetsPayload): Promise<GeneratePocAssetsResult> {
+    return this.request("generatePocAssets", payload);
   }
 
   oracleVectorSearch(payload: OracleVectorSearchExecutionPayload): Promise<OracleVectorSearchExecutionResult> {

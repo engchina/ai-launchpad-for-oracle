@@ -3,6 +3,7 @@ import type {
   AiLaunchpadApi,
   AskPagePayload,
   CapturedPagePayload,
+  GeneratePocAssetsPayload,
   OracleVectorSearchExecutionPayload,
   RagAskPayload,
   SaveScreenshotPayload,
@@ -32,6 +33,7 @@ const api: AiLaunchpadApi = {
     sqlclCheck: () => ipcRenderer.invoke("local-connector:sqlcl-check"),
     adbWalletCheck: () => ipcRenderer.invoke("local-connector:adb-wallet-check"),
     objectStorageCheck: () => ipcRenderer.invoke("local-connector:object-storage-check"),
+    generatePocAssets: (payload: GeneratePocAssetsPayload) => ipcRenderer.invoke("local-connector:generate-poc-assets", payload),
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) =>
       ipcRenderer.invoke("local-connector:oracle-vector-search", payload)
   }
