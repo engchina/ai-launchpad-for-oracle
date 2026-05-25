@@ -58,6 +58,7 @@ function createReadme(config: NormalizedPocAssetConfig): string {
     "- `sql/setup_vector_search.sql`: AI Vector Search table と sample query の SQL template",
     "- `python/ingest_documents.py`: Object Storage から文書を読み込む Python skeleton",
     "- `terraform/object_storage.tf`: PoC 用 Object Storage bucket の Terraform skeleton",
+    "- `checklist.md`: PoC 実行前の readiness と validation checklist",
     "",
     "## Safety",
     "",
@@ -139,6 +140,33 @@ function createTerraform(config: NormalizedPocAssetConfig): string {
   ].join("\n");
 }
 
+function createChecklist(config: NormalizedPocAssetConfig): string {
+  return [
+    `# ${config.workspaceName} PoC Checklist`,
+    "",
+    `## Scope`,
+    "",
+    `- Playbook: ${config.playbookTitle}`,
+    `- Use case: ${config.useCase}`,
+    `- Target table: ${config.dbSchema}.${config.vectorTable}`,
+    `- Object Storage: ${config.objectStorageNamespace}/${config.objectStorageBucket}`,
+    "",
+    "## Readiness",
+    "",
+    "- [ ] OCI config profile と compartment を確認する",
+    "- [ ] ADB wallet、network、DB user 権限を確認する",
+    "- [ ] Object Storage bucket と IAM policy を確認する",
+    "- [ ] 顧客データ、secret、private key を package に含めていないことを確認する",
+    "",
+    "## Demo validation",
+    "",
+    "- [ ] SQL table と VECTOR column の作成手順をレビューする",
+    "- [ ] document chunking と embedding model の前提を説明できる",
+    "- [ ] similarity query の結果と引用 source を確認する",
+    "- [ ] PoC 後の follow-up action と owner を整理する"
+  ].join("\n");
+}
+
 function createAsset(kind: GeneratedPocAsset["kind"], fileName: string, title: string, content: string): GeneratedPocAsset {
   return {
     kind,
@@ -159,7 +187,8 @@ export function generatePocAssets(payload: GeneratePocAssetsPayload = {}): Gener
       createAsset("readme", "README.md", "PoC README", createReadme(config)),
       createAsset("sql", "sql/setup_vector_search.sql", "AI Vector Search SQL", createSql(config)),
       createAsset("python", "python/ingest_documents.py", "Document ingestion Python", createPython(config)),
-      createAsset("terraform", "terraform/object_storage.tf", "Object Storage Terraform", createTerraform(config))
+      createAsset("terraform", "terraform/object_storage.tf", "Object Storage Terraform", createTerraform(config)),
+      createAsset("checklist", "checklist.md", "PoC validation checklist", createChecklist(config))
     ]
   };
 }

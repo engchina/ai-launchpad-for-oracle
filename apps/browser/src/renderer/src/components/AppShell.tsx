@@ -105,9 +105,21 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
         fileName: "sql/setup_vector_search.sql",
         title: "AI Vector Search SQL",
         content: "-- AI Vector Search SQL template\nCREATE TABLE AI_LAUNCHPAD_CHUNKS (ID NUMBER, CHUNK_TEXT CLOB, VECTOR_EMBEDDING VECTOR);"
+      },
+      {
+        kind: "checklist",
+        fileName: "checklist.md",
+        title: "PoC validation checklist",
+        content: `# ${workspaceName} PoC Checklist\n\n- [ ] Playbook の前提を確認する\n- [ ] SQL、Python、Terraform template をレビューする\n- [ ] secret、wallet、private key が含まれていないことを確認する`
       }
     ]
   };
+}
+
+function formatPocAssetPackage(result: GeneratePocAssetsResult): string {
+  return result.assets
+    .map((asset) => [`# ${asset.fileName}`, "", asset.content].join("\n"))
+    .join("\n\n---\n\n");
 }
 
 type LocalConnectorDiagnostic = {
@@ -607,6 +619,10 @@ export function AppShell(): ReactElement {
     void copyToClipboard(asset.content, `${asset.fileName} をコピーしました`);
   }
 
+  function handleCopyPocPackage(result: GeneratePocAssetsResult): void {
+    void copyToClipboard(formatPocAssetPackage(result), "PoC package をコピーしました");
+  }
+
   function handleRemoveKnowledgeChunk(chunk: KnowledgeChunk): void {
     if (chunk.sourceKind === "document") {
       removeKnowledgeDocument(chunk.captureId);
@@ -1007,6 +1023,7 @@ export function AppShell(): ReactElement {
                 onGenerate={handleGeneratePocAssets}
                 onSelectAsset={setSelectedPocAssetKind}
                 onCopyAsset={handleCopyPocAsset}
+                onCopyPackage={handleCopyPocPackage}
               />
             </div>
           </aside>
@@ -1297,7 +1314,8 @@ function PocAssetsPanel({
   isGenerating,
   onGenerate,
   onSelectAsset,
-  onCopyAsset
+  onCopyAsset,
+  onCopyPackage
 }: {
   result: GeneratePocAssetsResult | null;
   selectedKind: GeneratedPocAsset["kind"];
@@ -1305,12 +1323,14 @@ function PocAssetsPanel({
   onGenerate: () => void;
   onSelectAsset: (kind: GeneratedPocAsset["kind"]) => void;
   onCopyAsset: (asset: GeneratedPocAsset) => void;
+  onCopyPackage: (result: GeneratePocAssetsResult) => void;
 }): ReactElement {
   const assetKindLabels: Record<GeneratedPocAsset["kind"], string> = {
     readme: "README",
     sql: "SQL",
     python: "Python",
-    terraform: "Terraform"
+    terraform: "Terraform",
+    checklist: "Checklist"
   };
   const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
 
@@ -1338,9 +1358,15 @@ function PocAssetsPanel({
               <p className="text-sm leading-6 text-slate-700">{result.message}</p>
               <p className="mt-1 text-[11px] font-medium text-slate-500">Generated {formatCheckedAt(result.generatedAt)}</p>
             </div>
-            <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
-              {result.assets.length} files
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
+                {result.assets.length} files
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => onCopyPackage(result)} className="h-7 px-2">
+                <ClipboardList aria-hidden="true" className="h-4 w-4" />
+                一括コピー
+              </Button>
+            </div>
           </div>
 
           {result.warnings.length > 0 ? (

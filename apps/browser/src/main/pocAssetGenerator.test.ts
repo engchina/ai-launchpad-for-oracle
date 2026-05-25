@@ -10,7 +10,9 @@ test("generatePocAssets returns starter assets", () => {
   });
 
   assert.equal(result.status, "generated");
-  assert.equal(result.assets.length, 4);
+  assert.equal(result.assets.length, 5);
   assert.match(result.assets[1].content, /SALES_AI\.CUSTOMER_CHUNKS/);
   assert.match(result.assets[2].content, /demo-bucket/);
+  assert.match(result.assets[4].content, /PoC Checklist/);
+  assert.match(result.assets[4].content, /SALES_AI\.CUSTOMER_CHUNKS/);
 });
