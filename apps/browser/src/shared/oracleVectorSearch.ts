@@ -1,0 +1,214 @@
+export type OracleVectorSearchConfig = {
+  connectionName?: string;
+  tableName?: string;
+  vectorColumn?: string;
+  textColumn?: string;
+  embeddingModel?: string;
+  topK?: number;
+  configured: boolean;
+};
+
+export type OracleVectorSearchExecutionStatus = "not_configured" | "invalid_config" | "dry_run" | "unavailable";
+
+export type OracleVectorSearchBindVariable = {
+  name: string;
+  purpose: string;
+};
+
+export type OracleVectorSearchPlan = {
+  connectionName: string;
+  tableName: string;
+  vectorColumn: string;
+  textColumn: string;
+  embeddingModel: string;
+  topK: number;
+  sqlPreview: string;
+  bindVariables: OracleVectorSearchBindVariable[];
+};
+
+export type OracleVectorSearchExecutionPayload = {
+  question: string;
+  config?: Partial<OracleVectorSearchConfig>;
+  maxResults?: number;
+};
+
+export type OracleVectorSearchExecutionResult = {
+  status: OracleVectorSearchExecutionStatus;
+  message: string;
+  plan?: OracleVectorSearchPlan;
+  validationErrors?: string[];
+  latencyMs: number;
+  executedAt: string;
+};
+
+export const defaultOracleVectorSearchConfig: OracleVectorSearchConfig = {
+  connectionName: "",
+  tableName: "",
+  vectorColumn: "VECTOR_EMBEDDING",
+  textColumn: "CHUNK_TEXT",
+  embeddingModel: "",
+  topK: 3,
+  configured: false
+};
+
+const simpleOracleIdentifierPattern = /^[A-Za-z][A-Za-z0-9_$#]*$/;
+
+const requiredConfigFields: Array<{
+  key: keyof Pick<OracleVectorSearchConfig, "connectionName" | "tableName" | "vectorColumn" | "textColumn" | "embeddingModel">;
+  label: string;
+}> = [
+  { key: "connectionName", label: "connection" },
+  { key: "tableName", label: "table" },
+  { key: "vectorColumn", label: "vector column" },
+  { key: "textColumn", label: "text column" },
+  { key: "embeddingModel", label: "embedding model" }
+];
+
+function normalizeConfigString(value: string | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function normalizeTopK(value: number | undefined): number {
+  const requestedTopK = Number(value ?? defaultOracleVectorSearchConfig.topK);
+  const integerTopK = Number.isFinite(requestedTopK)
+    ? Math.trunc(requestedTopK)
+    : (defaultOracleVectorSearchConfig.topK ?? 3);
+  return Math.max(1, Math.min(integerTopK, 20));
+}
+
+function isOracleIdentifierPath(value: string): boolean {
+  return value.split(".").every((part) => simpleOracleIdentifierPattern.test(part));
+}
+
+function createIdentifierValidationErrors(config: OracleVectorSearchConfig): string[] {
+  const identifiers = [
+    { label: "table", value: config.tableName ?? "" },
+    { label: "vector column", value: config.vectorColumn ?? "" },
+    { label: "text column", value: config.textColumn ?? "" }
+  ];
+
+  return identifiers.flatMap(({ label, value }) =>
+    isOracleIdentifierPath(value)
+      ? []
+      : [`${label} は schema.table または column 形式の Oracle identifier として指定してください。`]
+  );
+}
+
+export function getMissingOracleVectorSearchConfigFields(config: OracleVectorSearchConfig): string[] {
+  return requiredConfigFields.flatMap(({ key, label }) => (normalizeConfigString(config[key]) ? [] : [label]));
+}
+
+export function isOracleVectorSearchConfigured(config: OracleVectorSearchConfig): boolean {
+  return getMissingOracleVectorSearchConfigFields(config).length === 0;
+}
+
+export function normalizeOracleVectorSearchConfig(
+  config: Partial<OracleVectorSearchConfig> = {}
+): OracleVectorSearchConfig {
+  const normalized = {
+    ...defaultOracleVectorSearchConfig,
+    ...config,
+    connectionName: normalizeConfigString(config.connectionName ?? defaultOracleVectorSearchConfig.connectionName),
+    tableName: normalizeConfigString(config.tableName ?? defaultOracleVectorSearchConfig.tableName),
+    vectorColumn: normalizeConfigString(config.vectorColumn ?? defaultOracleVectorSearchConfig.vectorColumn),
+    textColumn: normalizeConfigString(config.textColumn ?? defaultOracleVectorSearchConfig.textColumn),
+    embeddingModel: normalizeConfigString(config.embeddingModel ?? defaultOracleVectorSearchConfig.embeddingModel),
+    topK: normalizeTopK(config.topK)
+  };
+
+  return {
+    ...normalized,
+    configured: isOracleVectorSearchConfigured(normalized)
+  };
+}
+
+export function createOracleVectorSearchPlan(
+  question: string,
+  config: Partial<OracleVectorSearchConfig> = {},
+  maxResults?: number
+): { ok: true; plan: OracleVectorSearchPlan } | { ok: false; status: "not_configured" | "invalid_config"; errors: string[] } {
+  const normalizedConfig = normalizeOracleVectorSearchConfig({
+    ...config,
+    topK: maxResults ?? config.topK
+  });
+  const missingFields = getMissingOracleVectorSearchConfigFields(normalizedConfig);
+
+  if (missingFields.length > 0) {
+    return {
+      ok: false,
+      status: "not_configured",
+      errors: [`Oracle Vector Search config に不足があります: ${missingFields.join(", ")}`]
+    };
+  }
+
+  const validationErrors = createIdentifierValidationErrors(normalizedConfig);
+  if (validationErrors.length > 0) {
+    return {
+      ok: false,
+      status: "invalid_config",
+      errors: validationErrors
+    };
+  }
+
+  const topK = normalizedConfig.topK ?? defaultOracleVectorSearchConfig.topK ?? 3;
+  const sqlPreview = [
+    "SELECT",
+    "  ID,",
+    "  TITLE,",
+    "  SOURCE_URL,",
+    `  ${normalizedConfig.textColumn} AS CHUNK_TEXT,`,
+    `  VECTOR_DISTANCE(${normalizedConfig.vectorColumn}, :query_embedding, COSINE) AS DISTANCE`,
+    `FROM ${normalizedConfig.tableName}`,
+    "ORDER BY DISTANCE",
+    `FETCH FIRST ${topK} ROWS ONLY`
+  ].join("\n");
+
+  return {
+    ok: true,
+    plan: {
+      connectionName: normalizedConfig.connectionName ?? "",
+      tableName: normalizedConfig.tableName ?? "",
+      vectorColumn: normalizedConfig.vectorColumn ?? "",
+      textColumn: normalizedConfig.textColumn ?? "",
+      embeddingModel: normalizedConfig.embeddingModel ?? "",
+      topK,
+      sqlPreview,
+      bindVariables: [
+        {
+          name: "query_text",
+          purpose: `Embedding input text: ${question.trim() || "default knowledge question"}`
+        },
+        {
+          name: "query_embedding",
+          purpose: `Vector generated by ${normalizedConfig.embeddingModel}`
+        }
+      ]
+    }
+  };
+}
+
+export function executeOracleVectorSearchDryRun(payload: OracleVectorSearchExecutionPayload): OracleVectorSearchExecutionResult {
+  const startedAt = Date.now();
+  const planResult = createOracleVectorSearchPlan(payload.question, payload.config, payload.maxResults);
+
+  if (!planResult.ok) {
+    return {
+      status: planResult.status,
+      message:
+        planResult.status === "not_configured"
+          ? "Oracle Vector Search の実行に必要な設定が不足しています。"
+          : "Oracle Vector Search の設定に安全でない identifier が含まれています。",
+      validationErrors: planResult.errors,
+      latencyMs: Date.now() - startedAt,
+      executedAt: new Date().toISOString()
+    };
+  }
+
+  return {
+    status: "dry_run",
+    message: "Oracle Vector Search の実行契約を dry-run しました。実 DB 呼び出しはまだ実行していません。",
+    plan: planResult.plan,
+    latencyMs: Date.now() - startedAt,
+    executedAt: new Date().toISOString()
+  };
+}

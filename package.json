@@ -1,0 +1,14 @@
+{
+  "name": "ai-launchpad-for-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev:browser": "pnpm --filter @ai-launchpad/browser dev",
+    "typecheck": "pnpm --filter @ai-launchpad/browser typecheck",
+    "lint": "pnpm --filter @ai-launchpad/browser lint"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "esbuild"]
+  }
+}

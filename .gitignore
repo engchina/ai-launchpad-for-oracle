@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+.npm-cache/
+.tmp/
+
+apps/*/out/
+apps/*/dist/
+dist/
+
+*.log
+*.tsbuildinfo
