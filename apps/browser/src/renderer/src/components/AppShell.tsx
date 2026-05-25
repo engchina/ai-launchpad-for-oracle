@@ -119,6 +119,13 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
         content: `flowchart LR\n  user["Business user / Pre-sales"]\n  browser["AI Launchpad Browser Client"]\n  docs["Oracle Docs / Captured pages"]\n  objectStorage["OCI Object Storage"]\n  db["Oracle AI Database 26ai"]\n  genai["OCI Generative AI"]\n  package["PoC package"]\n\n  user --> browser\n  browser --> docs\n  browser --> package\n  docs --> objectStorage\n  objectStorage --> db\n  genai --> db\n  db --> browser\n  browser --> user`
       },
       {
+        kind: "env",
+        fileName: ".env.example",
+        title: "Environment variable template",
+        content:
+          "OCI_CLI_PROFILE=DEFAULT\nOCI_REGION=ap-tokyo-1\nOCI_OBJECT_STORAGE_NAMESPACE=<object-storage-namespace>\nOCI_OBJECT_STORAGE_BUCKET=<object-storage-bucket>\nSQLCL_PATH=<path-to-sqlcl>\nADB_WALLET_PATH=<path-to-wallet>\nTNS_ADMIN=<path-to-wallet-directory>"
+      },
+      {
         kind: "sql",
         fileName: "sql/setup_vector_search.sql",
         title: "AI Vector Search SQL",
@@ -143,6 +150,12 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
         fileName: "checklist.md",
         title: "PoC validation checklist",
         content: `# ${workspaceName} PoC Checklist\n\n- [ ] Playbook の前提を確認する\n- [ ] SQL、Python、Terraform template をレビューする\n- [ ] secret、wallet、private key が含まれていないことを確認する`
+      },
+      {
+        kind: "troubleshooting",
+        fileName: "troubleshooting.md",
+        title: "Troubleshooting guide",
+        content: `# ${workspaceName} Troubleshooting Guide\n\n- Local Connector、OCI config、Object Storage、ADB wallet、SQLcl の状態を確認する\n- 実 DB 接続が未準備の場合は SQL preview と Mermaid diagram で demo flow を説明する\n- 失敗時は原因、owner、次回確認事項を follow-up email に追記する`
       }
     ]
   };
@@ -1365,7 +1378,9 @@ function PocAssetsPanel({
     checklist: "Checklist",
     proposal: "Proposal",
     email: "Email",
-    diagram: "Diagram"
+    diagram: "Diagram",
+    env: "Env",
+    troubleshooting: "Troubleshooting"
   };
   const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
 

@@ -62,12 +62,34 @@ function createReadme(config: NormalizedPocAssetConfig): string {
     "- `proposal.md`: 顧客説明に使う提案 section の draft",
     "- `follow_up_email.md`: 次アクション確認用の follow-up email draft",
     "- `architecture/architecture.mmd`: Mermaid architecture diagram の draft",
+    "- `.env.example`: Local Connector と PoC 実行前確認用の環境変数 template",
+    "- `troubleshooting.md`: 初期切り分け用 troubleshooting guide",
     "",
     "## Safety",
     "",
     "- OCI private key、ADB wallet、password、顧客データはこの package に含めない",
     "- SQL / Python / Terraform は実行前に tenancy、compartment、IAM policy、network を確認する",
     "- 生成物は PoC starter であり、本番運用 template ではない"
+  ].join("\n");
+}
+
+function createEnvExample(config: NormalizedPocAssetConfig): string {
+  return [
+    "# AI Launchpad for Oracle PoC environment template",
+    "# 実値、password、wallet zip、private key はこの file に保存しないでください。",
+    "",
+    "OCI_CLI_PROFILE=DEFAULT",
+    `OCI_REGION=${config.ociRegion}`,
+    `OCI_OBJECT_STORAGE_NAMESPACE=${config.objectStorageNamespace}`,
+    `OCI_OBJECT_STORAGE_BUCKET=${config.objectStorageBucket}`,
+    "",
+    "SQLCL_PATH=<path-to-sqlcl>",
+    "ADB_WALLET_PATH=<path-to-wallet-directory-or-zip>",
+    "TNS_ADMIN=<path-to-wallet-directory>",
+    "",
+    `AI_LAUNCHPAD_DB_SCHEMA=${config.dbSchema}`,
+    `AI_LAUNCHPAD_VECTOR_TABLE=${config.vectorTable}`,
+    `AI_LAUNCHPAD_EMBEDDING_MODEL=${config.embeddingModel}`
   ].join("\n");
 }
 
@@ -90,6 +112,37 @@ function createArchitectureDiagram(config: NormalizedPocAssetConfig): string {
     "  genai --> db",
     "  db --> browser",
     "  browser --> user"
+  ].join("\n");
+}
+
+function createTroubleshooting(config: NormalizedPocAssetConfig): string {
+  return [
+    `# ${config.workspaceName} Troubleshooting Guide`,
+    "",
+    "## Local Connector",
+    "",
+    "- `health` が unavailable の場合は Browser Client と worker process の起動状態を確認する",
+    "- `OCI_CONFIG_FILE` または `~/.oci/config` が読めるか確認する",
+    "- tenancy、user、fingerprint、private key の実値を UI や package に貼り付けない",
+    "",
+    "## Object Storage",
+    "",
+    `- namespace / bucket: ${config.objectStorageNamespace}/${config.objectStorageBucket}`,
+    "- placeholder の場合は `.env.example` を環境固有の値に置き換える",
+    "- bucket name、region、IAM policy、compartment を確認する",
+    "",
+    "## ADB / SQLcl",
+    "",
+    "- `ADB_WALLET_PATH` または `TNS_ADMIN` が wallet directory / zip を指しているか確認する",
+    "- `SQLCL_PATH` または PATH 上の SQLcl executable を確認する",
+    `- target table: ${config.dbSchema}.${config.vectorTable}`,
+    "- VECTOR column、DB version、DBMS_CLOUD 権限を確認する",
+    "",
+    "## Demo fallback",
+    "",
+    "- 実 DB 接続が未準備の場合は SQL preview と Mermaid diagram で demo flow を説明する",
+    "- 顧客データを使えない場合は匿名化した sample text で chunking と retrieval flow を確認する",
+    "- 失敗時は原因、owner、次回確認事項を follow-up email に追記する"
   ].join("\n");
 }
 
@@ -262,10 +315,12 @@ export function generatePocAssets(payload: GeneratePocAssetsPayload = {}): Gener
       createAsset("proposal", "proposal.md", "Proposal section draft", createProposal(config)),
       createAsset("email", "follow_up_email.md", "Follow-up email draft", createFollowUpEmail(config)),
       createAsset("diagram", "architecture/architecture.mmd", "Mermaid architecture diagram", createArchitectureDiagram(config)),
+      createAsset("env", ".env.example", "Environment variable template", createEnvExample(config)),
       createAsset("sql", "sql/setup_vector_search.sql", "AI Vector Search SQL", createSql(config)),
       createAsset("python", "python/ingest_documents.py", "Document ingestion Python", createPython(config)),
       createAsset("terraform", "terraform/object_storage.tf", "Object Storage Terraform", createTerraform(config)),
-      createAsset("checklist", "checklist.md", "PoC validation checklist", createChecklist(config))
+      createAsset("checklist", "checklist.md", "PoC validation checklist", createChecklist(config)),
+      createAsset("troubleshooting", "troubleshooting.md", "Troubleshooting guide", createTroubleshooting(config))
     ]
   };
 }

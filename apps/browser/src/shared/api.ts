@@ -169,7 +169,17 @@ export type ObjectStorageCheckResult = {
   }>;
 };
 
-export type PocAssetKind = "readme" | "sql" | "python" | "terraform" | "checklist" | "proposal" | "email" | "diagram";
+export type PocAssetKind =
+  | "readme"
+  | "sql"
+  | "python"
+  | "terraform"
+  | "checklist"
+  | "proposal"
+  | "email"
+  | "diagram"
+  | "env"
+  | "troubleshooting";
 
 export type GeneratePocAssetsPayload = {
   workspaceName?: string;
