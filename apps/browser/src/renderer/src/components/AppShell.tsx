@@ -179,6 +179,35 @@ function formatPocAssetPackage(result: GeneratePocAssetsResult): string {
     .join("\n\n---\n\n");
 }
 
+function createPocPackageFileName(workspaceName: string, generatedAt: string): string {
+  const safeWorkspaceName =
+    workspaceName
+      .trim()
+      .split("")
+      .map((character) => (character.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(character) ? "-" : character))
+      .join("")
+      .replace(/\s+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "poc-package";
+  const safeDate = generatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10);
+
+  return `${safeWorkspaceName}-poc-package-${safeDate}.md`;
+}
+
+function downloadTextFile(fileName: string, content: string): void {
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = "noopener";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 type LocalConnectorDiagnostic = {
   health: LocalConnectorHealth;
   ociConfig: OciCheckConfigResult;
@@ -680,6 +709,13 @@ export function AppShell(): ReactElement {
     void copyToClipboard(formatPocAssetPackage(result), "PoC package をコピーしました");
   }
 
+  function handleDownloadPocPackage(result: GeneratePocAssetsResult): void {
+    const fileName = createPocPackageFileName(selectedWorkspace.name, result.generatedAt);
+
+    downloadTextFile(fileName, formatPocAssetPackage(result));
+    setClipboardStatus(`${fileName} を保存しました`);
+  }
+
   function handleRemoveKnowledgeChunk(chunk: KnowledgeChunk): void {
     if (chunk.sourceKind === "document") {
       removeKnowledgeDocument(chunk.captureId);
@@ -1081,6 +1117,7 @@ export function AppShell(): ReactElement {
                 onSelectAsset={setSelectedPocAssetKind}
                 onCopyAsset={handleCopyPocAsset}
                 onCopyPackage={handleCopyPocPackage}
+                onDownloadPackage={handleDownloadPocPackage}
               />
             </div>
           </aside>
@@ -1372,7 +1409,8 @@ function PocAssetsPanel({
   onGenerate,
   onSelectAsset,
   onCopyAsset,
-  onCopyPackage
+  onCopyPackage,
+  onDownloadPackage
 }: {
   result: GeneratePocAssetsResult | null;
   selectedKind: GeneratedPocAsset["kind"];
@@ -1381,6 +1419,7 @@ function PocAssetsPanel({
   onSelectAsset: (kind: GeneratedPocAsset["kind"]) => void;
   onCopyAsset: (asset: GeneratedPocAsset) => void;
   onCopyPackage: (result: GeneratePocAssetsResult) => void;
+  onDownloadPackage: (result: GeneratePocAssetsResult) => void;
 }): ReactElement {
   const assetKindLabels: Record<GeneratedPocAsset["kind"], string> = {
     readme: "README",
@@ -1413,7 +1452,7 @@ function PocAssetsPanel({
 
       {!result ? (
         <p className="mt-4 rounded-md border border-dashed border-border p-4 text-sm leading-6 text-slate-500">
-          現在の workspace、playbook、connector 設定から SQL、Python、Terraform、README template を生成できます。
+          現在の workspace、playbook、connector 設定から PoC package の starter template を生成できます。
         </p>
       ) : (
         <div className="mt-4">
@@ -1429,6 +1468,17 @@ function PocAssetsPanel({
               <Button variant="ghost" size="sm" onClick={() => onCopyPackage(result)} className="h-7 px-2">
                 <ClipboardList aria-hidden="true" className="h-4 w-4" />
                 一括コピー
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDownloadPackage(result)}
+                className="h-7 px-2"
+                aria-label="PoC package を Markdown で保存"
+                title="Markdown bundle として保存"
+              >
+                <FileDown aria-hidden="true" className="h-4 w-4" />
+                保存
               </Button>
             </div>
           </div>
