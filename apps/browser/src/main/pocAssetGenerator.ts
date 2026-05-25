@@ -64,12 +64,72 @@ function createReadme(config: NormalizedPocAssetConfig): string {
     "- `architecture/architecture.mmd`: Mermaid architecture diagram の draft",
     "- `.env.example`: Local Connector と PoC 実行前確認用の環境変数 template",
     "- `troubleshooting.md`: 初期切り分け用 troubleshooting guide",
+    "- `demo_script.md`: 顧客向け demo の進行 script",
+    "- `handover.md`: PoC 後の引き継ぎ document",
     "",
     "## Safety",
     "",
     "- OCI private key、ADB wallet、password、顧客データはこの package に含めない",
     "- SQL / Python / Terraform は実行前に tenancy、compartment、IAM policy、network を確認する",
     "- 生成物は PoC starter であり、本番運用 template ではない"
+  ].join("\n");
+}
+
+function createDemoScript(config: NormalizedPocAssetConfig): string {
+  return [
+    `# ${config.workspaceName} Demo Script`,
+    "",
+    "## Opening",
+    "",
+    `- 今日の目的は ${config.playbookTitle} を使い、${config.useCase} の PoC flow を短時間で確認することです。`,
+    "- 実 DB / OCI 操作が未準備の場合は、SQL preview、Mermaid diagram、checklist で前提と成功条件を確認します。",
+    "",
+    "## Flow",
+    "",
+    "1. Workspace と playbook の前提を確認する",
+    "2. Oracle Docs / capture から Knowledge chunk と source evidence を確認する",
+    `3. Object Storage と target table の前提を確認する: ${config.objectStorageNamespace}/${config.objectStorageBucket} -> ${config.dbSchema}.${config.vectorTable}`,
+    `4. Embedding model と vector search の説明を行う: ${config.embeddingModel}`,
+    "5. PoC package の README、SQL、Python、Terraform、checklist をレビューする",
+    "6. proposal section と follow-up email の next action を確認する",
+    "",
+    "## Expected outcome",
+    "",
+    "- 顧客が PoC の scope、必要権限、実行前確認事項を理解している",
+    "- 次回までの owner、期限、未確認リスクが明確になっている"
+  ].join("\n");
+}
+
+function createHandoverDocument(config: NormalizedPocAssetConfig): string {
+  return [
+    `# ${config.workspaceName} Handover Document`,
+    "",
+    "## Summary",
+    "",
+    `- Playbook: ${config.playbookTitle}`,
+    `- Use case: ${config.useCase}`,
+    `- Target table: ${config.dbSchema}.${config.vectorTable}`,
+    `- Object Storage: ${config.objectStorageNamespace}/${config.objectStorageBucket}`,
+    "",
+    "## Included assets",
+    "",
+    "- README / proposal / follow-up email",
+    "- Mermaid architecture diagram",
+    "- SQL / Python / Terraform starter templates",
+    "- `.env.example`、checklist、troubleshooting guide",
+    "- Demo script",
+    "",
+    "## Open items",
+    "",
+    "- [ ] compartment、IAM policy、network、ADB wallet の owner を確定する",
+    "- [ ] 顧客データ利用可否と anonymization 方針を確認する",
+    "- [ ] PoC 成功条件、fallback、期限を顧客と合意する",
+    "- [ ] 本番化に向けた security / governance review の要否を判断する",
+    "",
+    "## Handover notes",
+    "",
+    "- この package は starter template です。実 OCI API、DB 接続、Terraform apply は実行していません。",
+    "- secret、wallet、private key、顧客データは別管理とし、この package には含めません。"
   ].join("\n");
 }
 
@@ -316,11 +376,13 @@ export function generatePocAssets(payload: GeneratePocAssetsPayload = {}): Gener
       createAsset("email", "follow_up_email.md", "Follow-up email draft", createFollowUpEmail(config)),
       createAsset("diagram", "architecture/architecture.mmd", "Mermaid architecture diagram", createArchitectureDiagram(config)),
       createAsset("env", ".env.example", "Environment variable template", createEnvExample(config)),
+      createAsset("demo", "demo_script.md", "Demo script", createDemoScript(config)),
       createAsset("sql", "sql/setup_vector_search.sql", "AI Vector Search SQL", createSql(config)),
       createAsset("python", "python/ingest_documents.py", "Document ingestion Python", createPython(config)),
       createAsset("terraform", "terraform/object_storage.tf", "Object Storage Terraform", createTerraform(config)),
       createAsset("checklist", "checklist.md", "PoC validation checklist", createChecklist(config)),
-      createAsset("troubleshooting", "troubleshooting.md", "Troubleshooting guide", createTroubleshooting(config))
+      createAsset("troubleshooting", "troubleshooting.md", "Troubleshooting guide", createTroubleshooting(config)),
+      createAsset("handover", "handover.md", "Handover document", createHandoverDocument(config))
     ]
   };
 }

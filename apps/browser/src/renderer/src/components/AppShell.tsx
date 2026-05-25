@@ -126,6 +126,12 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
           "OCI_CLI_PROFILE=DEFAULT\nOCI_REGION=ap-tokyo-1\nOCI_OBJECT_STORAGE_NAMESPACE=<object-storage-namespace>\nOCI_OBJECT_STORAGE_BUCKET=<object-storage-bucket>\nSQLCL_PATH=<path-to-sqlcl>\nADB_WALLET_PATH=<path-to-wallet>\nTNS_ADMIN=<path-to-wallet-directory>"
       },
       {
+        kind: "demo",
+        fileName: "demo_script.md",
+        title: "Demo script",
+        content: `# ${workspaceName} Demo Script\n\n- ${playbookTitle} の目的と PoC flow を説明する\n- Knowledge source、SQL preview、Mermaid diagram、checklist を順番に確認する\n- owner、期限、fallback 方針を整理する`
+      },
+      {
         kind: "sql",
         fileName: "sql/setup_vector_search.sql",
         title: "AI Vector Search SQL",
@@ -156,6 +162,12 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
         fileName: "troubleshooting.md",
         title: "Troubleshooting guide",
         content: `# ${workspaceName} Troubleshooting Guide\n\n- Local Connector、OCI config、Object Storage、ADB wallet、SQLcl の状態を確認する\n- 実 DB 接続が未準備の場合は SQL preview と Mermaid diagram で demo flow を説明する\n- 失敗時は原因、owner、次回確認事項を follow-up email に追記する`
+      },
+      {
+        kind: "handover",
+        fileName: "handover.md",
+        title: "Handover document",
+        content: `# ${workspaceName} Handover Document\n\n## Included assets\n\n- README / proposal / follow-up email\n- Mermaid architecture diagram\n- SQL / Python / Terraform starter templates\n- .env.example / checklist / troubleshooting guide\n\n## Open items\n\n- [ ] compartment、IAM policy、network、ADB wallet の owner を確定する\n- [ ] PoC 成功条件、fallback、期限を顧客と合意する`
       }
     ]
   };
@@ -1380,7 +1392,9 @@ function PocAssetsPanel({
     email: "Email",
     diagram: "Diagram",
     env: "Env",
-    troubleshooting: "Troubleshooting"
+    demo: "Demo",
+    troubleshooting: "Troubleshooting",
+    handover: "Handover"
   };
   const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
 

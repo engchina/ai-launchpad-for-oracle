@@ -179,7 +179,9 @@ export type PocAssetKind =
   | "email"
   | "diagram"
   | "env"
-  | "troubleshooting";
+  | "troubleshooting"
+  | "demo"
+  | "handover";
 
 export type GeneratePocAssetsPayload = {
   workspaceName?: string;
