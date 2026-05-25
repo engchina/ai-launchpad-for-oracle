@@ -45,7 +45,13 @@ import {
   type KnowledgeChunk,
   type KnowledgeSearchResult
 } from "@renderer/lib/knowledge";
-import type { LocalConnectorHealth, OciCheckConfigResult, OracleVectorSearchExecutionResult, SqlclCheckResult } from "../../../shared/api";
+import type {
+  AdbWalletCheckResult,
+  LocalConnectorHealth,
+  OciCheckConfigResult,
+  OracleVectorSearchExecutionResult,
+  SqlclCheckResult
+} from "../../../shared/api";
 import {
   ingestTextDocument,
   MAX_TEXT_DOCUMENT_BYTES,
@@ -82,6 +88,7 @@ type LocalConnectorDiagnostic = {
   health: LocalConnectorHealth;
   ociConfig: OciCheckConfigResult;
   sqlcl: SqlclCheckResult;
+  adbWallet: AdbWalletCheckResult;
   checkedAt: string;
 };
 
@@ -471,11 +478,12 @@ export function AppShell(): ReactElement {
   async function handleCheckLocalConnector(): Promise<void> {
     setConnectorCheckState("checking");
     try {
-      const [health, ociConfig, sqlcl] = window.aiLaunchpad
+      const [health, ociConfig, sqlcl, adbWallet] = window.aiLaunchpad
         ? await Promise.all([
             window.aiLaunchpad.localConnector.health(),
             window.aiLaunchpad.localConnector.ociCheckConfig(),
-            window.aiLaunchpad.localConnector.sqlclCheck()
+            window.aiLaunchpad.localConnector.sqlclCheck(),
+            window.aiLaunchpad.localConnector.adbWalletCheck()
           ])
         : await Promise.resolve([
             {
@@ -491,13 +499,18 @@ export function AppShell(): ReactElement {
             {
               status: "not-configured",
               message: "renderer preview では SQLcl を確認しません。"
-            } satisfies SqlclCheckResult
+            } satisfies SqlclCheckResult,
+            {
+              status: "not-configured",
+              message: "renderer preview では ADB wallet を確認しません。"
+            } satisfies AdbWalletCheckResult
           ] as const);
 
       setConnectorDiagnostic({
         health,
         ociConfig,
         sqlcl,
+        adbWallet,
         checkedAt: new Date().toISOString()
       });
     } catch {
@@ -515,6 +528,10 @@ export function AppShell(): ReactElement {
         sqlcl: {
           status: "unavailable",
           message: "SQLcl check に失敗しました。IPC または connector process を確認してください。"
+        },
+        adbWallet: {
+          status: "unavailable",
+          message: "ADB wallet check に失敗しました。IPC または connector process を確認してください。"
         },
         checkedAt: new Date().toISOString()
       });
@@ -1340,6 +1357,7 @@ function OracleVectorConfigPanel({
             <ConnectorDiagnosticRow label="Health" value={`${connectorDiagnostic.health.status} / ${connectorDiagnostic.health.mode}`} />
             <ConnectorDiagnosticRow label="OCI config" value={connectorDiagnostic.ociConfig.status} />
             <ConnectorDiagnosticRow label="SQLcl" value={connectorDiagnostic.sqlcl.status} />
+            <ConnectorDiagnosticRow label="ADB wallet" value={connectorDiagnostic.adbWallet.status} />
             {connectorDiagnostic.ociConfig.profile ? (
               <ConnectorDiagnosticRow label="Profile" value={connectorDiagnostic.ociConfig.profile} />
             ) : null}
@@ -1349,6 +1367,7 @@ function OracleVectorConfigPanel({
           ) : null}
           <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.ociConfig.message}</p>
           <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.sqlcl.message}</p>
+          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.adbWallet.message}</p>
           {connectorDiagnostic.ociConfig.configPath ? (
             <p className="mt-2 break-all text-[11px] leading-5 text-amber-700">config: {connectorDiagnostic.ociConfig.configPath}</p>
           ) : null}
@@ -1357,6 +1376,9 @@ function OracleVectorConfigPanel({
           ) : null}
           {connectorDiagnostic.sqlcl.executablePath ? (
             <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">sqlcl: {connectorDiagnostic.sqlcl.executablePath}</p>
+          ) : null}
+          {connectorDiagnostic.adbWallet.walletPath ? (
+            <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">wallet: {connectorDiagnostic.adbWallet.walletPath}</p>
           ) : null}
           {connectorDiagnostic.ociConfig.checks?.length ? (
             <ul className="mt-2 space-y-1">

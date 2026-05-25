@@ -30,6 +30,7 @@ const api: AiLaunchpadApi = {
     health: () => ipcRenderer.invoke("local-connector:health"),
     ociCheckConfig: () => ipcRenderer.invoke("local-connector:oci-check-config"),
     sqlclCheck: () => ipcRenderer.invoke("local-connector:sqlcl-check"),
+    adbWalletCheck: () => ipcRenderer.invoke("local-connector:adb-wallet-check"),
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) =>
       ipcRenderer.invoke("local-connector:oracle-vector-search", payload)
   }

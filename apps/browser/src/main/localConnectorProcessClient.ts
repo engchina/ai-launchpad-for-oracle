@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { utilityProcess, type UtilityProcess } from "electron";
 import type {
+  AdbWalletCheckResult,
   LocalConnectorHealth,
   OciCheckConfigResult,
   OracleVectorSearchExecutionPayload,
@@ -38,6 +39,10 @@ export class LocalConnectorProcessClient {
 
   sqlclCheck(): Promise<SqlclCheckResult> {
     return this.request("sqlclCheck", undefined);
+  }
+
+  adbWalletCheck(): Promise<AdbWalletCheckResult> {
+    return this.request("adbWalletCheck", undefined);
   }
 
   oracleVectorSearch(payload: OracleVectorSearchExecutionPayload): Promise<OracleVectorSearchExecutionResult> {

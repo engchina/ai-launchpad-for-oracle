@@ -145,6 +145,17 @@ export type SqlclCheckResult = {
   }>;
 };
 
+export type AdbWalletCheckResult = {
+  status: "ready" | "not-configured" | "invalid" | "unavailable";
+  message: string;
+  walletPath?: string;
+  checks?: Array<{
+    name: string;
+    ok: boolean;
+    message: string;
+  }>;
+};
+
 export type AiLaunchpadApi = {
   browserApi: {
     listCaptures: () => Promise<ListCapturesResult>;
@@ -166,6 +177,7 @@ export type AiLaunchpadApi = {
     health: () => Promise<LocalConnectorHealth>;
     ociCheckConfig: () => Promise<OciCheckConfigResult>;
     sqlclCheck: () => Promise<SqlclCheckResult>;
+    adbWalletCheck: () => Promise<AdbWalletCheckResult>;
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) => Promise<OracleVectorSearchExecutionResult>;
   };
 };

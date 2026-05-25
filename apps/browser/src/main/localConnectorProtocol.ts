@@ -1,4 +1,5 @@
 import type {
+  AdbWalletCheckResult,
   LocalConnectorHealth,
   OciCheckConfigResult,
   OracleVectorSearchExecutionPayload,
@@ -10,6 +11,7 @@ export type LocalConnectorRequestPayloadByType = {
   health: undefined;
   ociCheckConfig: undefined;
   sqlclCheck: undefined;
+  adbWalletCheck: undefined;
   oracleVectorSearch: OracleVectorSearchExecutionPayload;
 };
 
@@ -17,6 +19,7 @@ export type LocalConnectorResponsePayloadByType = {
   health: LocalConnectorHealth;
   ociCheckConfig: OciCheckConfigResult;
   sqlclCheck: SqlclCheckResult;
+  adbWalletCheck: AdbWalletCheckResult;
   oracleVectorSearch: OracleVectorSearchExecutionResult;
 };
 
