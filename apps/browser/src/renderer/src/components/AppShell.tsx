@@ -45,6 +45,7 @@ import {
   type KnowledgeChunk,
   type KnowledgeSearchResult
 } from "@renderer/lib/knowledge";
+import { createKnowledgeAnswerFileName, formatKnowledgeAnswerMarkdown } from "@renderer/lib/knowledgeAnswerExport";
 import type {
   AdbWalletCheckResult,
   GeneratedPocAsset,
@@ -555,6 +556,29 @@ export function AppShell(): ReactElement {
     } finally {
       setKnowledgeAskState("idle");
     }
+  }
+
+  function createKnowledgeAnswerMarkdown(): string {
+    return formatKnowledgeAnswerMarkdown({
+      workspaceName: selectedWorkspace.name,
+      playbookTitle: selectedPlaybook.title,
+      question: knowledgeQuestion,
+      answer: knowledgeAnswer,
+      adapterStatus: knowledgeAdapterStatus,
+      sources: knowledgeSources,
+      oracleVectorExecution
+    });
+  }
+
+  function handleCopyKnowledgeAnswer(): void {
+    void copyToClipboard(createKnowledgeAnswerMarkdown(), "Grounded answer をコピーしました");
+  }
+
+  function handleDownloadKnowledgeAnswer(): void {
+    const fileName = createKnowledgeAnswerFileName(selectedWorkspace.name, new Date().toISOString());
+
+    downloadTextFile(fileName, createKnowledgeAnswerMarkdown());
+    setClipboardStatus(`${fileName} を保存しました`);
   }
 
   async function handleClearCaptures(): Promise<void> {
@@ -1107,6 +1131,8 @@ export function AppShell(): ReactElement {
                 onRemove={handleRemoveKnowledgeChunk}
                 onImportDocument={handleImportDocument}
                 onAsk={handleAskKnowledge}
+                onCopyAnswer={handleCopyKnowledgeAnswer}
+                onDownloadAnswer={handleDownloadKnowledgeAnswer}
               />
 
               <PocAssetsPanel
@@ -1231,7 +1257,9 @@ function KnowledgePanel({
   onClear,
   onRemove,
   onImportDocument,
-  onAsk
+  onAsk,
+  onCopyAnswer,
+  onDownloadAnswer
 }: {
   captureCount: number;
   chunks: KnowledgeChunk[];
@@ -1256,6 +1284,8 @@ function KnowledgePanel({
   onRemove: (chunk: KnowledgeChunk) => void;
   onImportDocument: () => void;
   onAsk: () => void;
+  onCopyAnswer: () => void;
+  onDownloadAnswer: () => void;
 }): ReactElement {
   return (
     <section className="mt-5 rounded-md border border-border bg-white p-4">
@@ -1368,9 +1398,26 @@ function KnowledgePanel({
 
       {answer ? (
         <div className="mt-4 rounded-md border border-border bg-slate-50 p-3" aria-live="polite">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grounded Answer</p>
-            {adapterStatus ? <span className="shrink-0 text-[11px] font-medium text-slate-500">{adapterStatus}</span> : null}
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              {adapterStatus ? <span className="min-w-0 break-all text-[11px] font-medium text-slate-500">{adapterStatus}</span> : null}
+              <Button variant="ghost" size="sm" onClick={onCopyAnswer} className="h-7 px-2">
+                <Copy aria-hidden="true" className="h-4 w-4" />
+                コピー
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onDownloadAnswer}
+                className="h-7 px-2"
+                aria-label="Grounded answer を Markdown で保存"
+                title="Grounded answer を Markdown で保存"
+              >
+                <FileDown aria-hidden="true" className="h-4 w-4" />
+                保存
+              </Button>
+            </div>
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-700">{answer}</p>
           {oracleVectorExecution ? <OracleVectorExecutionPreview execution={oracleVectorExecution} /> : null}
