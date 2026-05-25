@@ -61,12 +61,35 @@ function createReadme(config: NormalizedPocAssetConfig): string {
     "- `checklist.md`: PoC 実行前の readiness と validation checklist",
     "- `proposal.md`: 顧客説明に使う提案 section の draft",
     "- `follow_up_email.md`: 次アクション確認用の follow-up email draft",
+    "- `architecture/architecture.mmd`: Mermaid architecture diagram の draft",
     "",
     "## Safety",
     "",
     "- OCI private key、ADB wallet、password、顧客データはこの package に含めない",
     "- SQL / Python / Terraform は実行前に tenancy、compartment、IAM policy、network を確認する",
     "- 生成物は PoC starter であり、本番運用 template ではない"
+  ].join("\n");
+}
+
+function createArchitectureDiagram(config: NormalizedPocAssetConfig): string {
+  return [
+    "flowchart LR",
+    `  user["Business user / Pre-sales"]`,
+    `  browser["AI Launchpad Browser Client"]`,
+    `  docs["Oracle Docs / Captured pages"]`,
+    `  objectStorage["OCI Object Storage\\n${config.objectStorageNamespace}/${config.objectStorageBucket}"]`,
+    `  db["Oracle AI Database 26ai\\n${config.dbSchema}.${config.vectorTable}"]`,
+    `  genai["OCI Generative AI\\n${config.embeddingModel}"]`,
+    `  package["PoC package\\nREADME / SQL / Python / Terraform / Checklist"]`,
+    "",
+    "  user --> browser",
+    "  browser --> docs",
+    "  browser --> package",
+    "  docs --> objectStorage",
+    "  objectStorage --> db",
+    "  genai --> db",
+    "  db --> browser",
+    "  browser --> user"
   ].join("\n");
 }
 
@@ -238,6 +261,7 @@ export function generatePocAssets(payload: GeneratePocAssetsPayload = {}): Gener
       createAsset("readme", "README.md", "PoC README", createReadme(config)),
       createAsset("proposal", "proposal.md", "Proposal section draft", createProposal(config)),
       createAsset("email", "follow_up_email.md", "Follow-up email draft", createFollowUpEmail(config)),
+      createAsset("diagram", "architecture/architecture.mmd", "Mermaid architecture diagram", createArchitectureDiagram(config)),
       createAsset("sql", "sql/setup_vector_search.sql", "AI Vector Search SQL", createSql(config)),
       createAsset("python", "python/ingest_documents.py", "Document ingestion Python", createPython(config)),
       createAsset("terraform", "terraform/object_storage.tf", "Object Storage Terraform", createTerraform(config)),

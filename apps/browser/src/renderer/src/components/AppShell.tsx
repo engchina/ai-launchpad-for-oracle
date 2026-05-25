@@ -113,6 +113,12 @@ function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: stri
         content: `件名: ${workspaceName} PoC package の次アクション確認\n\n本日は ${playbookTitle} の PoC 準備についてお時間をいただき、ありがとうございました。\n\n次回までに data scope、ADB / Object Storage / IAM readiness、成功条件を確認します。`
       },
       {
+        kind: "diagram",
+        fileName: "architecture/architecture.mmd",
+        title: "Mermaid architecture diagram",
+        content: `flowchart LR\n  user["Business user / Pre-sales"]\n  browser["AI Launchpad Browser Client"]\n  docs["Oracle Docs / Captured pages"]\n  objectStorage["OCI Object Storage"]\n  db["Oracle AI Database 26ai"]\n  genai["OCI Generative AI"]\n  package["PoC package"]\n\n  user --> browser\n  browser --> docs\n  browser --> package\n  docs --> objectStorage\n  objectStorage --> db\n  genai --> db\n  db --> browser\n  browser --> user`
+      },
+      {
         kind: "sql",
         fileName: "sql/setup_vector_search.sql",
         title: "AI Vector Search SQL",
@@ -1358,7 +1364,8 @@ function PocAssetsPanel({
     terraform: "Terraform",
     checklist: "Checklist",
     proposal: "Proposal",
-    email: "Email"
+    email: "Email",
+    diagram: "Diagram"
   };
   const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
 

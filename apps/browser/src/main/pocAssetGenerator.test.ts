@@ -10,21 +10,25 @@ test("generatePocAssets returns starter assets", () => {
   });
 
   assert.equal(result.status, "generated");
-  assert.equal(result.assets.length, 7);
+  assert.equal(result.assets.length, 8);
 
   const proposal = result.assets.find((asset) => asset.kind === "proposal");
   const email = result.assets.find((asset) => asset.kind === "email");
+  const diagram = result.assets.find((asset) => asset.kind === "diagram");
   const sql = result.assets.find((asset) => asset.kind === "sql");
   const python = result.assets.find((asset) => asset.kind === "python");
   const checklist = result.assets.find((asset) => asset.kind === "checklist");
 
   assert.ok(proposal);
   assert.ok(email);
+  assert.ok(diagram);
   assert.ok(sql);
   assert.ok(python);
   assert.ok(checklist);
   assert.match(proposal.content, /Proposal Section/);
   assert.match(email.content, /次アクション確認/);
+  assert.match(diagram.content, /flowchart LR/);
+  assert.match(diagram.content, /SALES_AI\.CUSTOMER_CHUNKS/);
   assert.match(sql.content, /SALES_AI\.CUSTOMER_CHUNKS/);
   assert.match(python.content, /demo-bucket/);
   assert.match(checklist.content, /PoC Checklist/);
