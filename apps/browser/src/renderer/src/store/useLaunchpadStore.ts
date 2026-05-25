@@ -34,6 +34,7 @@ type LaunchpadState = {
   extractChecklist: () => void;
   explainSelection: (selectedText?: string) => void;
   setAskPageAnswer: (answer: string, sources: Array<{ title: string; url: string }>) => void;
+  hydrateCaptures: (captures: CapturedPage[]) => void;
   addCapture: (capture: CapturedPage) => void;
   clearCaptures: () => void;
   addCaptureToKnowledge: (captureId: string) => void;
@@ -114,6 +115,11 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           assistantMode: "ask",
           askPageAnswer: answer,
           askPageSources: sources
+        }),
+      hydrateCaptures: (captures) =>
+        set({
+          captures,
+          knowledgeCaptureIds: get().knowledgeCaptureIds.filter((captureId) => captures.some((capture) => capture.id === captureId))
         }),
       addCapture: (capture) =>
         set((state) => ({

@@ -1,4 +1,4 @@
-import type { PageSourceType } from "../../../shared/api";
+import type { CapturedPageRecord, PageSourceType } from "../../../shared/api";
 
 export type Workspace = {
   id: string;
@@ -16,18 +16,7 @@ export type Playbook = {
   demoSteps: string[];
 };
 
-export type CapturedPage = {
-  id: string;
-  workspaceId: string;
-  kind: "page" | "selection" | "screenshot";
-  title: string;
-  url: string;
-  sourceType: PageSourceType;
-  summary?: string;
-  selectedText?: string;
-  screenshotDataUrl?: string;
-  savedAt: string;
-};
+export type CapturedPage = CapturedPageRecord;
 
 export const mockWorkspaces: Workspace[] = [
   {

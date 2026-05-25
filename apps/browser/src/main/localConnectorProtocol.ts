@@ -2,18 +2,21 @@ import type {
   LocalConnectorHealth,
   OciCheckConfigResult,
   OracleVectorSearchExecutionPayload,
-  OracleVectorSearchExecutionResult
+  OracleVectorSearchExecutionResult,
+  SqlclCheckResult
 } from "../shared/api";
 
 export type LocalConnectorRequestPayloadByType = {
   health: undefined;
   ociCheckConfig: undefined;
+  sqlclCheck: undefined;
   oracleVectorSearch: OracleVectorSearchExecutionPayload;
 };
 
 export type LocalConnectorResponsePayloadByType = {
   health: LocalConnectorHealth;
   ociCheckConfig: OciCheckConfigResult;
+  sqlclCheck: SqlclCheckResult;
   oracleVectorSearch: OracleVectorSearchExecutionResult;
 };
 

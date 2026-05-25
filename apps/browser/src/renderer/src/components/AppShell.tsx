@@ -27,7 +27,7 @@ import {
   X,
   type LucideIcon
 } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type ReactElement, useCallback, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserSurface, type BrowserSurfaceHandle, type BrowserSurfaceState } from "@renderer/components/BrowserSurface";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
@@ -45,7 +45,7 @@ import {
   type KnowledgeChunk,
   type KnowledgeSearchResult
 } from "@renderer/lib/knowledge";
-import type { LocalConnectorHealth, OciCheckConfigResult, OracleVectorSearchExecutionResult } from "../../../shared/api";
+import type { LocalConnectorHealth, OciCheckConfigResult, OracleVectorSearchExecutionResult, SqlclCheckResult } from "../../../shared/api";
 import {
   ingestTextDocument,
   MAX_TEXT_DOCUMENT_BYTES,
@@ -63,9 +63,25 @@ const sourceLabels = {
   other: "Web"
 };
 
+function createPreviewCaptureResult(capture: Omit<CapturedPage, "id" | "savedAt">): { ok: true; id: string; savedAt: string; capture: CapturedPage } {
+  const id = crypto.randomUUID();
+  const savedAt = new Date().toISOString();
+  return {
+    ok: true,
+    id,
+    savedAt,
+    capture: {
+      id,
+      savedAt,
+      ...capture
+    }
+  };
+}
+
 type LocalConnectorDiagnostic = {
   health: LocalConnectorHealth;
   ociConfig: OciCheckConfigResult;
+  sqlcl: SqlclCheckResult;
   checkedAt: string;
 };
 
@@ -91,6 +107,7 @@ export function AppShell(): ReactElement {
     extractChecklist,
     explainSelection,
     setAskPageAnswer,
+    hydrateCaptures,
     addCapture,
     clearCaptures,
     addCaptureToKnowledge,
@@ -140,6 +157,46 @@ export function AppShell(): ReactElement {
   );
   const sourceType = detectSourceType(currentUrl);
 
+  useEffect(() => {
+    let canceled = false;
+
+    async function loadLocalStore(): Promise<void> {
+      if (!window.aiLaunchpad) {
+        return;
+      }
+
+      try {
+        const [storedCaptures, storedDocuments] = await Promise.all([
+          window.aiLaunchpad.browserApi.listCaptures(),
+          window.aiLaunchpad.documentIngestion.listTextDocuments()
+        ]);
+
+        if (canceled) {
+          return;
+        }
+
+        hydrateCaptures(storedCaptures.captures);
+        if (storedCaptures.captures.length > 0) {
+          setSelectedCaptureId((current) => current || storedCaptures.captures[0].id);
+        }
+
+        const documentChunks = storedDocuments.documents.flatMap((entry) => entry.chunks);
+        if (documentChunks.length > 0) {
+          addKnowledgeDocumentChunks(documentChunks);
+        }
+      } catch {
+        if (!canceled) {
+          setDocumentImportStatus("ローカル保存データを読み込めませんでした。");
+        }
+      }
+    }
+
+    void loadLocalStore();
+    return () => {
+      canceled = true;
+    };
+  }, [addKnowledgeDocumentChunks, hydrateCaptures]);
+
   const currentContext = useMemo(
     () => ({
       workspace: selectedWorkspace.name,
@@ -184,17 +241,18 @@ export function AppShell(): ReactElement {
 
     const result = window.aiLaunchpad
       ? await window.aiLaunchpad.browserApi.savePage(payload)
-      : { ok: true as const, id: crypto.randomUUID(), savedAt: new Date().toISOString() };
+      : createPreviewCaptureResult({
+          workspaceId: selectedWorkspaceId,
+          kind: "page",
+          title: pageTitle,
+          url: pageUrl,
+          sourceType: pageSourceType,
+          summary: payload.summary
+        });
 
     addCapture({
-      id: result.id,
-      workspaceId: selectedWorkspaceId,
-      kind: "page",
-      title: pageTitle,
-      url: pageUrl,
-      sourceType: pageSourceType,
-      summary: payload.summary,
-      savedAt: result.savedAt
+      ...result.capture,
+      sourceType: detectSourceType(result.capture.url)
     });
     setSaveState("saved");
     setSelectedCaptureId(result.id);
@@ -213,19 +271,22 @@ export function AppShell(): ReactElement {
           workspaceId: selectedWorkspaceId,
           url: pageUrl,
           title: pageTitle,
+          sourceType: pageSourceType,
           screenshotDataUrl
         })
-      : { ok: true as const, id: crypto.randomUUID(), savedAt: new Date().toISOString() };
+      : createPreviewCaptureResult({
+          workspaceId: selectedWorkspaceId,
+          kind: "screenshot",
+          title: `スクリーンショット: ${pageTitle}`,
+          url: pageUrl,
+          sourceType: pageSourceType,
+          screenshotDataUrl
+        });
 
     addCapture({
-      id: result.id,
-      workspaceId: selectedWorkspaceId,
-      kind: "screenshot",
-      title: `スクリーンショット: ${pageTitle}`,
-      url: pageUrl,
-      sourceType: pageSourceType,
-      screenshotDataUrl,
-      savedAt: result.savedAt
+      ...result.capture,
+      sourceType: detectSourceType(result.capture.url),
+      screenshotDataUrl: result.capture.screenshotDataUrl ?? screenshotDataUrl
     });
     setScreenshotState("saved");
     setSelectedCaptureId(result.id);
@@ -253,19 +314,22 @@ export function AppShell(): ReactElement {
       ? await window.aiLaunchpad.browserApi.saveSelection({
           workspaceId: selectedWorkspaceId,
           url: pageUrl,
+          title: pageTitle,
+          sourceType: pageSourceType,
           selectedText: trimmedText
         })
-      : { ok: true as const, id: crypto.randomUUID(), savedAt: new Date().toISOString() };
+      : createPreviewCaptureResult({
+          workspaceId: selectedWorkspaceId,
+          kind: "selection",
+          title: `選択: ${pageTitle}`,
+          url: pageUrl,
+          sourceType: pageSourceType,
+          selectedText: trimmedText
+        });
 
     addCapture({
-      id: result.id,
-      workspaceId: selectedWorkspaceId,
-      kind: "selection",
-      title: `選択: ${pageTitle}`,
-      url: pageUrl,
-      sourceType: pageSourceType,
-      selectedText: trimmedText,
-      savedAt: result.savedAt
+      ...result.capture,
+      sourceType: detectSourceType(result.capture.url)
     });
     setSelectedCaptureId(result.id);
     explainSelection(trimmedText);
@@ -358,7 +422,20 @@ export function AppShell(): ReactElement {
     }
   }
 
-  function handleClearKnowledge(): void {
+  async function handleClearCaptures(): Promise<void> {
+    if (window.aiLaunchpad) {
+      await window.aiLaunchpad.browserApi.clearCaptures();
+    }
+
+    clearCaptures();
+    setSelectedCaptureId("");
+  }
+
+  async function handleClearKnowledge(): Promise<void> {
+    if (window.aiLaunchpad) {
+      await window.aiLaunchpad.documentIngestion.clearTextDocuments();
+    }
+
     clearKnowledge();
     setKnowledgeAnswer("");
     setKnowledgeSources([]);
@@ -394,8 +471,12 @@ export function AppShell(): ReactElement {
   async function handleCheckLocalConnector(): Promise<void> {
     setConnectorCheckState("checking");
     try {
-      const [health, ociConfig] = window.aiLaunchpad
-        ? await Promise.all([window.aiLaunchpad.localConnector.health(), window.aiLaunchpad.localConnector.ociCheckConfig()])
+      const [health, ociConfig, sqlcl] = window.aiLaunchpad
+        ? await Promise.all([
+            window.aiLaunchpad.localConnector.health(),
+            window.aiLaunchpad.localConnector.ociCheckConfig(),
+            window.aiLaunchpad.localConnector.sqlclCheck()
+          ])
         : await Promise.resolve([
             {
               status: "mock-ready",
@@ -406,12 +487,17 @@ export function AppShell(): ReactElement {
             {
               status: "not-configured",
               message: "renderer preview では OCI config を読み取りません。"
-            } satisfies OciCheckConfigResult
+            } satisfies OciCheckConfigResult,
+            {
+              status: "not-configured",
+              message: "renderer preview では SQLcl を確認しません。"
+            } satisfies SqlclCheckResult
           ] as const);
 
       setConnectorDiagnostic({
         health,
         ociConfig,
+        sqlcl,
         checkedAt: new Date().toISOString()
       });
     } catch {
@@ -425,6 +511,10 @@ export function AppShell(): ReactElement {
         ociConfig: {
           status: "unavailable",
           message: "OCI config check に失敗しました。IPC または connector process を確認してください。"
+        },
+        sqlcl: {
+          status: "unavailable",
+          message: "SQLcl check に失敗しました。IPC または connector process を確認してください。"
         },
         checkedAt: new Date().toISOString()
       });
@@ -734,10 +824,10 @@ export function AppShell(): ReactElement {
                     <h2 className="text-sm font-semibold">Captures</h2>
                     <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                       <DatabaseZap aria-hidden="true" className="h-3.5 w-3.5 text-sky-700" />
-                      localStorage に保存
+                      Electron local store に保存
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={clearCaptures} disabled={captures.length === 0}>
+                  <Button variant="ghost" size="sm" onClick={handleClearCaptures} disabled={captures.length === 0}>
                     クリア
                   </Button>
                 </div>
@@ -1249,6 +1339,7 @@ function OracleVectorConfigPanel({
           <dl className="mt-2 space-y-1 text-xs leading-5 text-amber-900">
             <ConnectorDiagnosticRow label="Health" value={`${connectorDiagnostic.health.status} / ${connectorDiagnostic.health.mode}`} />
             <ConnectorDiagnosticRow label="OCI config" value={connectorDiagnostic.ociConfig.status} />
+            <ConnectorDiagnosticRow label="SQLcl" value={connectorDiagnostic.sqlcl.status} />
             {connectorDiagnostic.ociConfig.profile ? (
               <ConnectorDiagnosticRow label="Profile" value={connectorDiagnostic.ociConfig.profile} />
             ) : null}
@@ -1257,11 +1348,15 @@ function OracleVectorConfigPanel({
             <p className="mt-2 text-xs leading-5 text-amber-800">{connectorDiagnostic.health.message}</p>
           ) : null}
           <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.ociConfig.message}</p>
+          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.sqlcl.message}</p>
           {connectorDiagnostic.ociConfig.configPath ? (
             <p className="mt-2 break-all text-[11px] leading-5 text-amber-700">config: {connectorDiagnostic.ociConfig.configPath}</p>
           ) : null}
           {connectorDiagnostic.ociConfig.keyFilePath ? (
             <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">key: {connectorDiagnostic.ociConfig.keyFilePath}</p>
+          ) : null}
+          {connectorDiagnostic.sqlcl.executablePath ? (
+            <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">sqlcl: {connectorDiagnostic.sqlcl.executablePath}</p>
           ) : null}
           {connectorDiagnostic.ociConfig.checks?.length ? (
             <ul className="mt-2 space-y-1">

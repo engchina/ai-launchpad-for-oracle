@@ -1,6 +1,7 @@
 import type { LocalConnectorHealth } from "../shared/api";
 import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
 import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
+import { checkSqlcl } from "./sqlclProbe";
 import type {
   LocalConnectorRequest,
   LocalConnectorRequestType,
@@ -36,6 +37,10 @@ async function handleRequest<T extends LocalConnectorRequestType>(
 
   if (request.type === "ociCheckConfig") {
     return (await probeOciConfig()) as LocalConnectorResponsePayloadByType[T];
+  }
+
+  if (request.type === "sqlclCheck") {
+    return (await checkSqlcl()) as LocalConnectorResponsePayloadByType[T];
   }
 
   if (request.type === "oracleVectorSearch" && request.payload) {

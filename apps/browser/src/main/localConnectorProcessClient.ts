@@ -5,7 +5,8 @@ import type {
   LocalConnectorHealth,
   OciCheckConfigResult,
   OracleVectorSearchExecutionPayload,
-  OracleVectorSearchExecutionResult
+  OracleVectorSearchExecutionResult,
+  SqlclCheckResult
 } from "../shared/api";
 import type {
   LocalConnectorRequestFor,
@@ -33,6 +34,10 @@ export class LocalConnectorProcessClient {
 
   ociCheckConfig(): Promise<OciCheckConfigResult> {
     return this.request("ociCheckConfig", undefined);
+  }
+
+  sqlclCheck(): Promise<SqlclCheckResult> {
+    return this.request("sqlclCheck", undefined);
   }
 
   oracleVectorSearch(payload: OracleVectorSearchExecutionPayload): Promise<OracleVectorSearchExecutionResult> {

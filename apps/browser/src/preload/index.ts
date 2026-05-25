@@ -11,20 +11,25 @@ import type {
 
 const api: AiLaunchpadApi = {
   browserApi: {
+    listCaptures: () => ipcRenderer.invoke("browser:list-captures"),
     savePage: (payload: CapturedPagePayload) => ipcRenderer.invoke("browser:save-page", payload),
     saveSelection: (payload: SaveSelectionPayload) => ipcRenderer.invoke("browser:save-selection", payload),
     saveScreenshot: (payload: SaveScreenshotPayload) => ipcRenderer.invoke("browser:save-screenshot", payload),
+    clearCaptures: () => ipcRenderer.invoke("browser:clear-captures"),
     askPage: (payload: AskPagePayload) => ipcRenderer.invoke("browser:ask-page", payload)
   },
   ragAdapter: {
     askKnowledge: (payload: RagAskPayload) => ipcRenderer.invoke("rag:ask-knowledge", payload)
   },
   documentIngestion: {
-    importTextDocument: () => ipcRenderer.invoke("document:import-text")
+    listTextDocuments: () => ipcRenderer.invoke("document:list-text-documents"),
+    importTextDocument: () => ipcRenderer.invoke("document:import-text"),
+    clearTextDocuments: () => ipcRenderer.invoke("document:clear-text-documents")
   },
   localConnector: {
     health: () => ipcRenderer.invoke("local-connector:health"),
     ociCheckConfig: () => ipcRenderer.invoke("local-connector:oci-check-config"),
+    sqlclCheck: () => ipcRenderer.invoke("local-connector:sqlcl-check"),
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) =>
       ipcRenderer.invoke("local-connector:oracle-vector-search", payload)
   }

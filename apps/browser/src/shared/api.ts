@@ -3,6 +3,7 @@ import type { OracleVectorSearchExecutionPayload, OracleVectorSearchExecutionRes
 import type { RagAskPayload, RagAskResult } from "./rag";
 
 export type PageSourceType = "oracle_docs" | "oci_console" | "livelabs" | "github" | "other";
+export type CaptureKind = "page" | "selection" | "screenshot";
 
 export type {
   IngestTextDocumentPayload,
@@ -37,10 +38,34 @@ export type CapturedPagePayload = {
   summary?: string;
 };
 
+export type CapturedPageRecord = {
+  id: string;
+  workspaceId: string;
+  kind: CaptureKind;
+  title: string;
+  url: string;
+  sourceType: PageSourceType;
+  summary?: string;
+  selectedText?: string;
+  screenshotDataUrl?: string;
+  screenshotPath?: string;
+  savedAt: string;
+};
+
 export type CapturedPageResult = {
   ok: true;
   id: string;
   savedAt: string;
+  capture: CapturedPageRecord;
+};
+
+export type ListCapturesResult = {
+  captures: CapturedPageRecord[];
+};
+
+export type ClearCapturesResult = {
+  ok: true;
+  clearedAt: string;
 };
 
 export type AskPagePayload = {
@@ -61,6 +86,8 @@ export type AskPageResult = {
 export type SaveSelectionPayload = {
   workspaceId: string;
   url: string;
+  title?: string;
+  sourceType?: PageSourceType;
   selectedText: string;
 };
 
@@ -68,7 +95,19 @@ export type SaveScreenshotPayload = {
   workspaceId: string;
   url: string;
   title: string;
+  sourceType?: PageSourceType;
   screenshotDataUrl?: string;
+};
+
+export type StoredKnowledgeDocument = Extract<IngestTextDocumentResult, { ok: true }>;
+
+export type ListTextDocumentsResult = {
+  documents: StoredKnowledgeDocument[];
+};
+
+export type ClearTextDocumentsResult = {
+  ok: true;
+  clearedAt: string;
 };
 
 export type LocalConnectorStatus = "mock-ready" | "ready" | "unavailable";
@@ -95,22 +134,38 @@ export type OciCheckConfigResult = {
   }>;
 };
 
+export type SqlclCheckResult = {
+  status: "ready" | "not-configured" | "unavailable";
+  message: string;
+  executablePath?: string;
+  checks?: Array<{
+    name: string;
+    ok: boolean;
+    message: string;
+  }>;
+};
+
 export type AiLaunchpadApi = {
   browserApi: {
+    listCaptures: () => Promise<ListCapturesResult>;
     savePage: (payload: CapturedPagePayload) => Promise<CapturedPageResult>;
     saveSelection: (payload: SaveSelectionPayload) => Promise<CapturedPageResult>;
     saveScreenshot: (payload: SaveScreenshotPayload) => Promise<CapturedPageResult>;
+    clearCaptures: () => Promise<ClearCapturesResult>;
     askPage: (payload: AskPagePayload) => Promise<AskPageResult>;
   };
   ragAdapter: {
     askKnowledge: (payload: RagAskPayload) => Promise<RagAskResult>;
   };
   documentIngestion: {
+    listTextDocuments: () => Promise<ListTextDocumentsResult>;
     importTextDocument: () => Promise<IngestTextDocumentResult | null>;
+    clearTextDocuments: () => Promise<ClearTextDocumentsResult>;
   };
   localConnector: {
     health: () => Promise<LocalConnectorHealth>;
     ociCheckConfig: () => Promise<OciCheckConfigResult>;
+    sqlclCheck: () => Promise<SqlclCheckResult>;
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) => Promise<OracleVectorSearchExecutionResult>;
   };
 };

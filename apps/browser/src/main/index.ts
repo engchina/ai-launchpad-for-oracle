@@ -13,12 +13,23 @@ import type {
 } from "../shared/api";
 import { ingestTextDocument, MAX_TEXT_DOCUMENT_BYTES } from "../shared/documentIngestion";
 import { answerRagQuestion } from "../shared/rag";
+import { BrowserWorkspaceService } from "./browserWorkspaceService";
 import { LocalConnectorProcessClient } from "./localConnectorProcessClient";
+import {
+  clearStoredKnowledgeDocuments,
+  listStoredKnowledgeDocuments,
+  saveKnowledgeDocument
+} from "./localKnowledgeStore";
 
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
 
 const localConnector = new LocalConnectorProcessClient();
+const browserWorkspaceService = new BrowserWorkspaceService(getLocalStoreBaseDir);
+
+function getLocalStoreBaseDir(): string {
+  return app.getPath("userData");
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -68,38 +79,23 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  ipcMain.handle("browser:save-page", (_, payload: CapturedPagePayload) => ({
-    ok: true,
-    id: randomUUID(),
-    savedAt: new Date().toISOString(),
-    payload
-  }));
+  ipcMain.handle("browser:list-captures", () => browserWorkspaceService.listCaptures());
 
-  ipcMain.handle("browser:save-selection", (_, payload: SaveSelectionPayload) => ({
-    ok: true,
-    id: randomUUID(),
-    savedAt: new Date().toISOString(),
-    payload
-  }));
+  ipcMain.handle("browser:save-page", (_, payload: CapturedPagePayload) => browserWorkspaceService.savePage(payload));
 
-  ipcMain.handle("browser:save-screenshot", (_, payload: SaveScreenshotPayload) => ({
-    ok: true,
-    id: randomUUID(),
-    savedAt: new Date().toISOString(),
-    payload
-  }));
+  ipcMain.handle("browser:save-selection", (_, payload: SaveSelectionPayload) => browserWorkspaceService.saveSelection(payload));
 
-  ipcMain.handle("browser:ask-page", (_, payload: AskPagePayload) => ({
-    answer: `${payload.title} の内容を、現在のワークスペース向けに要約しました。Oracle AI Database、OCI Generative AI、PoC 準備に関係する前提条件と手順を優先して確認してください。`,
-    sources: [
-      {
-        title: payload.title,
-        url: payload.url
-      }
-    ]
-  }));
+  ipcMain.handle("browser:save-screenshot", (_, payload: SaveScreenshotPayload) => browserWorkspaceService.saveScreenshot(payload));
+
+  ipcMain.handle("browser:clear-captures", () => browserWorkspaceService.clearCaptures());
+
+  ipcMain.handle("browser:ask-page", (_, payload: AskPagePayload) => browserWorkspaceService.askPage(payload));
 
   ipcMain.handle("rag:ask-knowledge", (_, payload: RagAskPayload) => answerRagQuestion(payload));
+
+  ipcMain.handle("document:list-text-documents", async () => ({
+    documents: await listStoredKnowledgeDocuments(getLocalStoreBaseDir())
+  }));
 
   ipcMain.handle("document:import-text", async () => {
     const result = await dialog.showOpenDialog({
@@ -129,18 +125,34 @@ app.whenReady().then(() => {
 
     const text = await readFile(filePath, "utf8");
 
-    return ingestTextDocument({
+    const ingestionResult = ingestTextDocument({
       fileName: basename(filePath),
       sourcePath: filePath,
       text,
       documentId: `document-${randomUUID()}`,
       importedAt: new Date().toISOString()
     });
+
+    if (ingestionResult.ok) {
+      return saveKnowledgeDocument(getLocalStoreBaseDir(), ingestionResult);
+    }
+
+    return ingestionResult;
+  });
+
+  ipcMain.handle("document:clear-text-documents", async () => {
+    await clearStoredKnowledgeDocuments(getLocalStoreBaseDir());
+    return {
+      ok: true,
+      clearedAt: new Date().toISOString()
+    };
   });
 
   ipcMain.handle("local-connector:health", () => localConnector.health());
 
   ipcMain.handle("local-connector:oci-check-config", () => localConnector.ociCheckConfig());
+
+  ipcMain.handle("local-connector:sqlcl-check", () => localConnector.sqlclCheck());
 
   ipcMain.handle("local-connector:oracle-vector-search", (_, payload: OracleVectorSearchExecutionPayload) =>
     localConnector.oracleVectorSearch(payload)
