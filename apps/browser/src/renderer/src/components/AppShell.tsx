@@ -47,6 +47,8 @@ import {
 } from "@renderer/lib/knowledge";
 import type {
   AdbWalletCheckResult,
+  GeneratedPocAsset,
+  GeneratePocAssetsResult,
   LocalConnectorHealth,
   ObjectStorageCheckResult,
   OciCheckConfigResult,
@@ -82,6 +84,29 @@ function createPreviewCaptureResult(capture: Omit<CapturedPage, "id" | "savedAt"
       savedAt,
       ...capture
     }
+  };
+}
+
+function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: string): GeneratePocAssetsResult {
+  return {
+    status: "generated",
+    message: "renderer preview の PoC asset templates です。実行や外部接続は行っていません。",
+    generatedAt: new Date().toISOString(),
+    warnings: ["renderer preview では Local Connector を呼び出していません。"],
+    assets: [
+      {
+        kind: "readme",
+        fileName: "README.md",
+        title: "PoC README",
+        content: `# ${workspaceName}\n\n## Playbook\n\n${playbookTitle}\n\n## Safety\n\n- Secret、wallet、private key は含めない`
+      },
+      {
+        kind: "sql",
+        fileName: "sql/setup_vector_search.sql",
+        title: "AI Vector Search SQL",
+        content: "-- AI Vector Search SQL template\nCREATE TABLE AI_LAUNCHPAD_CHUNKS (ID NUMBER, CHUNK_TEXT CLOB, VECTOR_EMBEDDING VECTOR);"
+      }
+    ]
   };
 }
 
@@ -147,6 +172,9 @@ export function AppShell(): ReactElement {
   const [connectorCheckState, setConnectorCheckState] = useState<"idle" | "checking">("idle");
   const [connectorDiagnostic, setConnectorDiagnostic] = useState<LocalConnectorDiagnostic | null>(null);
   const [oracleVectorExecution, setOracleVectorExecution] = useState<OracleVectorSearchExecutionResult | null>(null);
+  const [pocAssetState, setPocAssetState] = useState<"idle" | "generating">("idle");
+  const [pocAssetResult, setPocAssetResult] = useState<GeneratePocAssetsResult | null>(null);
+  const [selectedPocAssetKind, setSelectedPocAssetKind] = useState<GeneratedPocAsset["kind"]>("readme");
   const [browserState, setBrowserState] = useState<BrowserSurfaceState>({
     canGoBack: false,
     canGoForward: false,
@@ -552,6 +580,33 @@ export function AppShell(): ReactElement {
     }
   }
 
+  async function handleGeneratePocAssets(): Promise<void> {
+    setPocAssetState("generating");
+    try {
+      const result = window.aiLaunchpad
+        ? await window.aiLaunchpad.localConnector.generatePocAssets({
+            workspaceName: selectedWorkspace.name,
+            playbookTitle: selectedPlaybook.title,
+            useCase: selectedPlaybook.category,
+            vectorTable: oracleVectorSearchConfig.tableName || undefined,
+            objectStorageNamespace: connectorDiagnostic?.objectStorage.namespace,
+            objectStorageBucket: connectorDiagnostic?.objectStorage.bucketName,
+            ociRegion: connectorDiagnostic?.objectStorage.region,
+            embeddingModel: oracleVectorSearchConfig.embeddingModel || undefined
+          })
+        : createPreviewPocAssetsResult(selectedWorkspace.name, selectedPlaybook.title);
+
+      setPocAssetResult(result);
+      setSelectedPocAssetKind(result.assets[0]?.kind ?? "readme");
+    } finally {
+      setPocAssetState("idle");
+    }
+  }
+
+  function handleCopyPocAsset(asset: GeneratedPocAsset): void {
+    void copyToClipboard(asset.content, `${asset.fileName} をコピーしました`);
+  }
+
   function handleRemoveKnowledgeChunk(chunk: KnowledgeChunk): void {
     if (chunk.sourceKind === "document") {
       removeKnowledgeDocument(chunk.captureId);
@@ -944,6 +999,15 @@ export function AppShell(): ReactElement {
                 onImportDocument={handleImportDocument}
                 onAsk={handleAskKnowledge}
               />
+
+              <PocAssetsPanel
+                result={pocAssetResult}
+                selectedKind={selectedPocAssetKind}
+                isGenerating={pocAssetState === "generating"}
+                onGenerate={handleGeneratePocAssets}
+                onSelectAsset={setSelectedPocAssetKind}
+                onCopyAsset={handleCopyPocAsset}
+              />
             </div>
           </aside>
         </div>
@@ -1223,6 +1287,109 @@ function KnowledgePanel({
           ) : null}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function PocAssetsPanel({
+  result,
+  selectedKind,
+  isGenerating,
+  onGenerate,
+  onSelectAsset,
+  onCopyAsset
+}: {
+  result: GeneratePocAssetsResult | null;
+  selectedKind: GeneratedPocAsset["kind"];
+  isGenerating: boolean;
+  onGenerate: () => void;
+  onSelectAsset: (kind: GeneratedPocAsset["kind"]) => void;
+  onCopyAsset: (asset: GeneratedPocAsset) => void;
+}): ReactElement {
+  const assetKindLabels: Record<GeneratedPocAsset["kind"], string> = {
+    readme: "README",
+    sql: "SQL",
+    python: "Python",
+    terraform: "Terraform"
+  };
+  const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
+
+  return (
+    <section className="mt-5 rounded-md border border-border bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">PoC Assets</p>
+          <h2 className="mt-1 text-sm font-semibold text-slate-950">Template Package</h2>
+        </div>
+        <Button variant="outline" size="sm" onClick={onGenerate} disabled={isGenerating}>
+          <FileDown aria-hidden="true" className="h-4 w-4" />
+          {isGenerating ? "生成中" : "生成"}
+        </Button>
+      </div>
+
+      {!result ? (
+        <p className="mt-4 rounded-md border border-dashed border-border p-4 text-sm leading-6 text-slate-500">
+          現在の workspace、playbook、connector 設定から SQL、Python、Terraform、README template を生成できます。
+        </p>
+      ) : (
+        <div className="mt-4">
+          <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-slate-700">{result.message}</p>
+              <p className="mt-1 text-[11px] font-medium text-slate-500">Generated {formatCheckedAt(result.generatedAt)}</p>
+            </div>
+            <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
+              {result.assets.length} files
+            </span>
+          </div>
+
+          {result.warnings.length > 0 ? (
+            <ul className="mt-3 space-y-1 border-l-2 border-amber-300 pl-3">
+              {result.warnings.map((warning) => (
+                <li key={warning} className="text-xs leading-5 text-amber-800">
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="PoC asset templates">
+            {result.assets.map((asset) => (
+              <button
+                key={`${asset.kind}-${asset.fileName}`}
+                type="button"
+                onClick={() => onSelectAsset(asset.kind)}
+                className={cn(
+                  "h-8 cursor-pointer rounded-md border px-3 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700",
+                  selectedAsset?.kind === asset.kind
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-border bg-white text-slate-700 hover:bg-slate-50"
+                )}
+              >
+                {assetKindLabels[asset.kind]}
+              </button>
+            ))}
+          </div>
+
+          {selectedAsset ? (
+            <div className="mt-4 border-t border-border pt-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950">{selectedAsset.title}</p>
+                  <p className="mt-1 break-all text-xs text-slate-500">{selectedAsset.fileName}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onCopyAsset(selectedAsset)}>
+                  <Copy aria-hidden="true" className="h-4 w-4" />
+                  コピー
+                </Button>
+              </div>
+              <pre className="mt-3 max-h-72 min-h-[180px] overflow-auto rounded-md bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
+                <code>{selectedAsset.content}</code>
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
