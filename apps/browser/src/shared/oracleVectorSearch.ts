@@ -27,6 +27,13 @@ export type OracleVectorSearchPlan = {
   bindVariables: OracleVectorSearchBindVariable[];
 };
 
+export type OracleVectorSearchReadinessCheck = {
+  name: string;
+  status: "ready" | "not-configured" | "invalid" | "unavailable";
+  message: string;
+  path?: string;
+};
+
 export type OracleVectorSearchExecutionPayload = {
   question: string;
   config?: Partial<OracleVectorSearchConfig>;
@@ -37,6 +44,7 @@ export type OracleVectorSearchExecutionResult = {
   status: OracleVectorSearchExecutionStatus;
   message: string;
   plan?: OracleVectorSearchPlan;
+  readinessChecks?: OracleVectorSearchReadinessCheck[];
   validationErrors?: string[];
   latencyMs: number;
   executedAt: string;

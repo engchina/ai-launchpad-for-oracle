@@ -1,9 +1,15 @@
-import type { GeneratePocAssetsPayload, LocalConnectorHealth, OracleVectorSearchExecutionPayload } from "../shared/api";
+import type {
+  GeneratePocAssetsPayload,
+  LocalConnectorHealth,
+  OracleVectorSearchExecutionPayload,
+  OracleVectorSearchExecutionResult
+} from "../shared/api";
 import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
 import { checkAdbWallet } from "./adbWalletProbe";
 import { checkObjectStorage } from "./objectStorageProbe";
 import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
 import { generatePocAssets } from "./pocAssetGenerator";
+import { createOracleVectorSearchReadinessChecks } from "./oracleVectorSearchReadiness";
 import { checkSqlcl } from "./sqlclProbe";
 import type {
   LocalConnectorRequest,
@@ -28,6 +34,23 @@ function createHealth(): LocalConnectorHealth {
     connector: "local-connector",
     mode: "not-connected",
     message: "Local Connector worker process は起動済みです。OCI / Oracle DB adapter はまだ接続していません。"
+  };
+}
+
+async function executeOracleVectorSearchWithReadiness(
+  payload: OracleVectorSearchExecutionPayload
+): Promise<OracleVectorSearchExecutionResult> {
+  const execution = executeOracleVectorSearchDryRun(payload);
+
+  if (execution.status !== "dry_run") {
+    return execution;
+  }
+
+  const [sqlcl, adbWallet] = await Promise.all([checkSqlcl(), checkAdbWallet()]);
+
+  return {
+    ...execution,
+    readinessChecks: createOracleVectorSearchReadinessChecks(sqlcl, adbWallet)
   };
 }
 
@@ -59,7 +82,9 @@ async function handleRequest<T extends LocalConnectorRequestType>(
   }
 
   if (request.type === "oracleVectorSearch" && request.payload) {
-    return executeOracleVectorSearchDryRun(request.payload as OracleVectorSearchExecutionPayload) as LocalConnectorResponsePayloadByType[T];
+    return (await executeOracleVectorSearchWithReadiness(
+      request.payload as OracleVectorSearchExecutionPayload
+    )) as LocalConnectorResponsePayloadByType[T];
   }
 
   throw new Error(`Unsupported Local Connector request: ${String(request.type)}`);

@@ -72,6 +72,17 @@ function formatOracleVectorExecution(execution: OracleVectorSearchExecutionResul
     lines.push("", "### Validation errors", "", ...execution.validationErrors.map((error) => `- ${error}`));
   }
 
+  if (execution.readinessChecks && execution.readinessChecks.length > 0) {
+    lines.push(
+      "",
+      "### Execution readiness",
+      "",
+      ...execution.readinessChecks.map((check) =>
+        `- ${check.name}: ${check.status} - ${check.message}${check.path ? ` (${check.path})` : ""}`
+      )
+    );
+  }
+
   if (execution.plan) {
     lines.push(
       "",

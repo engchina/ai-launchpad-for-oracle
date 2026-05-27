@@ -47,6 +47,19 @@ test("formatKnowledgeAnswerMarkdown includes answer sources and Oracle Vector pl
       message: "Oracle Vector Search の実行契約を dry-run しました。",
       latencyMs: 12,
       executedAt: "2026-05-26T10:20:30.000Z",
+      readinessChecks: [
+        {
+          name: "SQLcl",
+          status: "ready",
+          message: "SQLcl executable を確認しました。",
+          path: "C:\\oracle\\sqlcl\\bin\\sql.exe"
+        },
+        {
+          name: "ADB wallet",
+          status: "not-configured",
+          message: "ADB wallet path が未設定です。"
+        }
+      ],
       plan: {
         connectionName: "adb-sales-demo",
         tableName: "SALES_AI.CUSTOMER_CHUNKS",
@@ -70,6 +83,9 @@ test("formatKnowledgeAnswerMarkdown includes answer sources and Oracle Vector pl
   assert.match(markdown, /PoC の前提は\?/);
   assert.match(markdown, /Oracle AI Vector Search/);
   assert.match(markdown, /https:\/\/docs\.oracle\.com\/vector-search/);
+  assert.match(markdown, /### Execution readiness/);
+  assert.match(markdown, /SQLcl: ready - SQLcl executable を確認しました。/);
+  assert.match(markdown, /ADB wallet: not-configured - ADB wallet path が未設定です。/);
   assert.match(markdown, /```sql\nSELECT \*\nFROM SALES_AI\.CUSTOMER_CHUNKS\n```/);
   assert.match(markdown, /### SQLcl script preview/);
   assert.match(markdown, /VAR query_text CLOB/);
