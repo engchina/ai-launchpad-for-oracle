@@ -88,6 +88,12 @@ function formatOracleVectorExecution(execution: OracleVectorSearchExecutionResul
       execution.plan.sqlPreview,
       "```",
       "",
+      "### SQLcl script preview",
+      "",
+      "```sql",
+      execution.plan.sqlclScriptPreview,
+      "```",
+      "",
       "### Bind variables",
       "",
       ...execution.plan.bindVariables.map((bind) => `- \`${bind.name}\`: ${bind.purpose}`)

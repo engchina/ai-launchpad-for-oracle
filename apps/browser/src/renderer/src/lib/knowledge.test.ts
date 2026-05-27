@@ -111,6 +111,28 @@ test("Oracle Vector Search config normalizes configured state and topK", () => {
   assert.match(answer.answer, /dry-run/);
   assert.match(answer.oracleVectorSearch?.plan?.sqlPreview ?? "", /VECTOR_DISTANCE/);
   assert.match(answer.oracleVectorSearch?.plan?.sqlPreview ?? "", /FETCH FIRST 3 ROWS ONLY/);
+  assert.match(answer.oracleVectorSearch?.plan?.sqlclScriptPreview ?? "", /VAR query_text CLOB/);
+  assert.match(answer.oracleVectorSearch?.plan?.sqlclScriptPreview ?? "", /EXEC :query_text := 'vector index';/);
+  assert.match(answer.oracleVectorSearch?.plan?.sqlclScriptPreview ?? "", /FETCH FIRST 3 ROWS ONLY;/);
+});
+
+test("Oracle Vector Search SQLcl script preview escapes query text", () => {
+  const result = executeOracleVectorSearchDryRun({
+    question: "customer's vector\nquery",
+    config: {
+      connectionName: "adb-sales-demo",
+      tableName: "SALES_AI.CUSTOMER_CHUNKS",
+      vectorColumn: "VECTOR_EMBEDDING",
+      textColumn: "CHUNK_TEXT",
+      embeddingModel: "cohere.embed-multilingual-v3.0",
+      topK: 5
+    }
+  });
+
+  assert.equal(result.status, "dry_run");
+  assert.match(result.plan?.sqlclScriptPreview ?? "", /EXEC :query_text := 'customer''s vector query';/);
+  assert.match(result.plan?.sqlclScriptPreview ?? "", /Connection: adb-sales-demo/);
+  assert.match(result.plan?.sqlclScriptPreview ?? "", /Embedding model: cohere\.embed-multilingual-v3\.0/);
 });
 
 test("createOracleVectorSearchRagAnswer wraps Local Connector execution results", () => {

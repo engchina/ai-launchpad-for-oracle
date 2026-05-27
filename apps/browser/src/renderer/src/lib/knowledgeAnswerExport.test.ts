@@ -55,6 +55,7 @@ test("formatKnowledgeAnswerMarkdown includes answer sources and Oracle Vector pl
         embeddingModel: "cohere.embed-multilingual-v3.0",
         topK: 3,
         sqlPreview: "SELECT *\nFROM SALES_AI.CUSTOMER_CHUNKS",
+        sqlclScriptPreview: "VAR query_text CLOB\nEXEC :query_text := 'PoC の前提は?';\nSELECT *\nFROM SALES_AI.CUSTOMER_CHUNKS;",
         bindVariables: [
           {
             name: "query_embedding",
@@ -70,5 +71,7 @@ test("formatKnowledgeAnswerMarkdown includes answer sources and Oracle Vector pl
   assert.match(markdown, /Oracle AI Vector Search/);
   assert.match(markdown, /https:\/\/docs\.oracle\.com\/vector-search/);
   assert.match(markdown, /```sql\nSELECT \*\nFROM SALES_AI\.CUSTOMER_CHUNKS\n```/);
+  assert.match(markdown, /### SQLcl script preview/);
+  assert.match(markdown, /VAR query_text CLOB/);
   assert.match(markdown, /`query_embedding`/);
 });
