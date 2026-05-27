@@ -1,11 +1,22 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { createKnowledgeAnswerFileName, formatKnowledgeAnswerMarkdown } from "./knowledgeAnswerExport";
+import {
+  createKnowledgeAnswerFileName,
+  createOracleVectorSqlFileName,
+  formatKnowledgeAnswerMarkdown
+} from "./knowledgeAnswerExport";
 
 test("createKnowledgeAnswerFileName sanitizes unsafe filename characters", () => {
   assert.equal(
     createKnowledgeAnswerFileName('金融 PoC: RAG / "Demo"', "2026-05-26T10:20:30.000Z"),
     "金融-PoC-RAG-Demo-grounded-answer-2026-05-26.md"
+  );
+});
+
+test("createOracleVectorSqlFileName creates a SQL download filename", () => {
+  assert.equal(
+    createOracleVectorSqlFileName("金融 PoC: RAG", "2026-05-26T10:20:30.000Z"),
+    "金融-PoC-RAG-oracle-vector-plan-2026-05-26.sql"
   );
 });
 

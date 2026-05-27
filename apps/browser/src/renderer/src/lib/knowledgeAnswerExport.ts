@@ -32,6 +32,13 @@ export function createKnowledgeAnswerFileName(workspaceName: string, generatedAt
   return `${safeWorkspaceName}-grounded-answer-${safeDate}.md`;
 }
 
+export function createOracleVectorSqlFileName(workspaceName: string, generatedAt: string): string {
+  const safeWorkspaceName = normalizeFileNameSegment(workspaceName, "oracle-vector");
+  const safeDate = generatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10);
+
+  return `${safeWorkspaceName}-oracle-vector-plan-${safeDate}.sql`;
+}
+
 function formatSources(sources: RagSearchResult[]): string[] {
   if (sources.length === 0) {
     return ["根拠 source はありません。"];

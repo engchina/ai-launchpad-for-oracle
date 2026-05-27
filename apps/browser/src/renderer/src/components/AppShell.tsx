@@ -45,7 +45,11 @@ import {
   type KnowledgeChunk,
   type KnowledgeSearchResult
 } from "@renderer/lib/knowledge";
-import { createKnowledgeAnswerFileName, formatKnowledgeAnswerMarkdown } from "@renderer/lib/knowledgeAnswerExport";
+import {
+  createKnowledgeAnswerFileName,
+  createOracleVectorSqlFileName,
+  formatKnowledgeAnswerMarkdown
+} from "@renderer/lib/knowledgeAnswerExport";
 import type {
   AdbWalletCheckResult,
   GeneratedPocAsset,
@@ -578,6 +582,17 @@ export function AppShell(): ReactElement {
     const fileName = createKnowledgeAnswerFileName(selectedWorkspace.name, new Date().toISOString());
 
     downloadTextFile(fileName, createKnowledgeAnswerMarkdown());
+    setClipboardStatus(`${fileName} を保存しました`);
+  }
+
+  function handleCopyOracleVectorSql(sqlPreview: string): void {
+    void copyToClipboard(sqlPreview, "Oracle Vector SQL をコピーしました");
+  }
+
+  function handleDownloadOracleVectorSql(sqlPreview: string): void {
+    const fileName = createOracleVectorSqlFileName(selectedWorkspace.name, new Date().toISOString());
+
+    downloadTextFile(fileName, `${sqlPreview}\n`);
     setClipboardStatus(`${fileName} を保存しました`);
   }
 
@@ -1133,6 +1148,8 @@ export function AppShell(): ReactElement {
                 onAsk={handleAskKnowledge}
                 onCopyAnswer={handleCopyKnowledgeAnswer}
                 onDownloadAnswer={handleDownloadKnowledgeAnswer}
+                onCopyOracleVectorSql={handleCopyOracleVectorSql}
+                onDownloadOracleVectorSql={handleDownloadOracleVectorSql}
               />
 
               <PocAssetsPanel
@@ -1259,7 +1276,9 @@ function KnowledgePanel({
   onImportDocument,
   onAsk,
   onCopyAnswer,
-  onDownloadAnswer
+  onDownloadAnswer,
+  onCopyOracleVectorSql,
+  onDownloadOracleVectorSql
 }: {
   captureCount: number;
   chunks: KnowledgeChunk[];
@@ -1286,6 +1305,8 @@ function KnowledgePanel({
   onAsk: () => void;
   onCopyAnswer: () => void;
   onDownloadAnswer: () => void;
+  onCopyOracleVectorSql: (sqlPreview: string) => void;
+  onDownloadOracleVectorSql: (sqlPreview: string) => void;
 }): ReactElement {
   return (
     <section className="mt-5 rounded-md border border-border bg-white p-4">
@@ -1420,7 +1441,13 @@ function KnowledgePanel({
             </div>
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-700">{answer}</p>
-          {oracleVectorExecution ? <OracleVectorExecutionPreview execution={oracleVectorExecution} /> : null}
+          {oracleVectorExecution ? (
+            <OracleVectorExecutionPreview
+              execution={oracleVectorExecution}
+              onCopySql={onCopyOracleVectorSql}
+              onDownloadSql={onDownloadOracleVectorSql}
+            />
+          ) : null}
           {sources.length > 0 ? (
             <div className="mt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sources</p>
@@ -1581,7 +1608,15 @@ function PocAssetsPanel({
   );
 }
 
-function OracleVectorExecutionPreview({ execution }: { execution: OracleVectorSearchExecutionResult }): ReactElement {
+function OracleVectorExecutionPreview({
+  execution,
+  onCopySql,
+  onDownloadSql
+}: {
+  execution: OracleVectorSearchExecutionResult;
+  onCopySql: (sqlPreview: string) => void;
+  onDownloadSql: (sqlPreview: string) => void;
+}): ReactElement {
   if (!execution.plan) {
     return (
       <div className="mt-3 border-t border-border pt-3">
@@ -1593,9 +1628,26 @@ function OracleVectorExecutionPreview({ execution }: { execution: OracleVectorSe
 
   return (
     <div className="mt-3 border-t border-border pt-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Oracle Vector Plan</p>
-        <span className="shrink-0 text-[11px] font-medium text-slate-500">{execution.status}</span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-[11px] font-medium text-slate-500">{execution.status}</span>
+          <Button variant="ghost" size="sm" onClick={() => onCopySql(execution.plan?.sqlPreview ?? "")} className="h-7 px-2">
+            <Copy aria-hidden="true" className="h-4 w-4" />
+            SQL
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDownloadSql(execution.plan?.sqlPreview ?? "")}
+            className="h-7 px-2"
+            aria-label="Oracle Vector SQL を保存"
+            title="Oracle Vector SQL を保存"
+          >
+            <FileDown aria-hidden="true" className="h-4 w-4" />
+            保存
+          </Button>
+        </div>
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs leading-5 text-slate-600">
         <CompactPlanRow label="Connection" value={execution.plan.connectionName} />
