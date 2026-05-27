@@ -62,6 +62,8 @@ export type RagAskResult = {
   latencyMs?: number;
 };
 
+const defaultKnowledgeQuestion = "現在の knowledge set から PoC に使える要点を整理してください。";
+
 const stopWords = new Set([
   "the",
   "and",
@@ -124,6 +126,10 @@ function countOccurrences(value: string, term: string): number {
   }
 
   return value.split(term).length - 1;
+}
+
+export function normalizeRagQuestion(question: string): string {
+  return question.trim() || defaultKnowledgeQuestion;
 }
 
 function createExcerpt(chunk: RagChunk, matchedTerms: string[]): string {
@@ -219,13 +225,12 @@ export function getRagAdapterHealth(adapter: RagAdapterId, config?: OracleVector
   };
 }
 
-function answerOracleVectorSearchQuestion(payload: RagAskPayload, startedAt: number): RagAskResult {
-  const normalizedQuestion = payload.question.trim() || "現在の knowledge set から PoC に使える要点を整理してください。";
-  const execution = executeOracleVectorSearchDryRun({
-    question: normalizedQuestion,
-    config: payload.oracleVectorSearch ?? defaultOracleVectorSearchConfig,
-    maxResults: payload.maxResults
-  });
+export function createOracleVectorSearchRagAnswer(
+  payload: RagAskPayload,
+  execution: OracleVectorSearchExecutionResult,
+  latencyMs?: number
+): RagAskResult {
+  const normalizedQuestion = normalizeRagQuestion(payload.question);
   const adapterStatus =
     execution.status === "dry_run"
       ? "dry_run"
@@ -246,12 +251,23 @@ function answerOracleVectorSearchQuestion(payload: RagAskPayload, startedAt: num
     adapter: "oracle-vector-search",
     adapterStatus,
     oracleVectorSearch: execution,
-    latencyMs: Math.round(performance.now() - startedAt)
+    latencyMs
   };
 }
 
+function answerOracleVectorSearchQuestion(payload: RagAskPayload, startedAt: number): RagAskResult {
+  const normalizedQuestion = normalizeRagQuestion(payload.question);
+  const execution = executeOracleVectorSearchDryRun({
+    question: normalizedQuestion,
+    config: payload.oracleVectorSearch ?? defaultOracleVectorSearchConfig,
+    maxResults: payload.maxResults
+  });
+
+  return createOracleVectorSearchRagAnswer(payload, execution, Math.round(performance.now() - startedAt));
+}
+
 function answerLocalKeywordQuestion(payload: RagAskPayload, startedAt: number): RagAskResult {
-  const normalizedQuestion = payload.question.trim() || "現在の knowledge set から PoC に使える要点を整理してください。";
+  const normalizedQuestion = normalizeRagQuestion(payload.question);
 
   if (payload.chunks.length === 0) {
     return {

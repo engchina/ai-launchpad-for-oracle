@@ -6,7 +6,12 @@ import {
   searchKnowledge,
   type KnowledgeChunk
 } from "./knowledge";
-import { executeOracleVectorSearchDryRun, getRagAdapterHealth, normalizeOracleVectorSearchConfig } from "../../../shared/rag";
+import {
+  createOracleVectorSearchRagAnswer,
+  executeOracleVectorSearchDryRun,
+  getRagAdapterHealth,
+  normalizeOracleVectorSearchConfig
+} from "../../../shared/rag";
 import type { CapturedPage } from "../data/mockData";
 
 function createCapture(overrides: Partial<CapturedPage>): CapturedPage {
@@ -106,6 +111,37 @@ test("Oracle Vector Search config normalizes configured state and topK", () => {
   assert.match(answer.answer, /dry-run/);
   assert.match(answer.oracleVectorSearch?.plan?.sqlPreview ?? "", /VECTOR_DISTANCE/);
   assert.match(answer.oracleVectorSearch?.plan?.sqlPreview ?? "", /FETCH FIRST 3 ROWS ONLY/);
+});
+
+test("createOracleVectorSearchRagAnswer wraps Local Connector execution results", () => {
+  const execution = executeOracleVectorSearchDryRun({
+    question: " ",
+    config: {
+      connectionName: "adb-sales-demo",
+      tableName: "SALES_AI.CUSTOMER_CHUNKS",
+      vectorColumn: "VECTOR_EMBEDDING",
+      textColumn: "CHUNK_TEXT",
+      embeddingModel: "cohere.embed-multilingual-v3.0",
+      topK: 4
+    }
+  });
+  const answer = createOracleVectorSearchRagAnswer(
+    {
+      question: " ",
+      chunks: [],
+      maxResults: 4,
+      adapter: "oracle-vector-search"
+    },
+    execution,
+    42
+  );
+
+  assert.equal(answer.question, "現在の knowledge set から PoC に使える要点を整理してください。");
+  assert.equal(answer.status, "adapter_dry_run");
+  assert.equal(answer.adapterStatus, "dry_run");
+  assert.equal(answer.latencyMs, 42);
+  assert.equal(answer.oracleVectorSearch, execution);
+  assert.match(answer.answer, /SQL preview/);
 });
 
 test("Oracle Vector Search execution contract rejects unsafe identifiers", () => {

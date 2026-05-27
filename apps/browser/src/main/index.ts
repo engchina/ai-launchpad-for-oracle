@@ -7,12 +7,13 @@ import type {
   AskPagePayload,
   CapturedPagePayload,
   OracleVectorSearchExecutionPayload,
+  RagAskResult,
   RagAskPayload,
   SaveScreenshotPayload,
   SaveSelectionPayload
 } from "../shared/api";
 import { ingestTextDocument, MAX_TEXT_DOCUMENT_BYTES } from "../shared/documentIngestion";
-import { answerRagQuestion } from "../shared/rag";
+import { answerRagQuestion, createOracleVectorSearchRagAnswer, normalizeRagQuestion } from "../shared/rag";
 import { BrowserWorkspaceService } from "./browserWorkspaceService";
 import { LocalConnectorProcessClient } from "./localConnectorProcessClient";
 import {
@@ -72,6 +73,42 @@ function createWindow(): void {
   }
 }
 
+async function handleAskKnowledge(payload: RagAskPayload): Promise<RagAskResult> {
+  if (payload.adapter !== "oracle-vector-search") {
+    return answerRagQuestion(payload);
+  }
+
+  const startedAt = performance.now();
+  const question = normalizeRagQuestion(payload.question);
+
+  try {
+    const oracleVectorSearch = await localConnector.oracleVectorSearch({
+      question,
+      config: payload.oracleVectorSearch,
+      maxResults: payload.maxResults
+    });
+
+    return createOracleVectorSearchRagAnswer(
+      {
+        ...payload,
+        question
+      },
+      oracleVectorSearch,
+      Math.round(performance.now() - startedAt)
+    );
+  } catch {
+    return {
+      question,
+      answer: "Local Connector の Oracle Vector Search 呼び出しに失敗しました。worker process と IPC 設定を確認してください。",
+      results: [],
+      status: "adapter_unavailable",
+      adapter: "oracle-vector-search",
+      adapterStatus: "unavailable",
+      latencyMs: Math.round(performance.now() - startedAt)
+    };
+  }
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId("com.oracle.ai-launchpad.browser");
 
@@ -91,7 +128,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle("browser:ask-page", (_, payload: AskPagePayload) => browserWorkspaceService.askPage(payload));
 
-  ipcMain.handle("rag:ask-knowledge", (_, payload: RagAskPayload) => answerRagQuestion(payload));
+  ipcMain.handle("rag:ask-knowledge", (_, payload: RagAskPayload) => handleAskKnowledge(payload));
 
   ipcMain.handle("document:list-text-documents", async () => ({
     documents: await listStoredKnowledgeDocuments(getLocalStoreBaseDir())
