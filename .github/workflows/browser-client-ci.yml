@@ -1,0 +1,66 @@
+name: Browser Client CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/browser-client-ci.yml"
+      - "apps/browser/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/browser-client-ci.yml"
+      - "apps/browser/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-client-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-client:
+    name: Browser Client checks
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @ai-launchpad/browser typecheck
+
+      - name: Lint
+        run: pnpm --filter @ai-launchpad/browser lint
+
+      - name: Test knowledge contracts
+        run: pnpm --filter @ai-launchpad/browser test:knowledge
+
+      - name: Build Electron app
+        run: pnpm --filter @ai-launchpad/browser build

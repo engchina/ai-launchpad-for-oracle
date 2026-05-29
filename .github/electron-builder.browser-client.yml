@@ -2,6 +2,7 @@ appId: jp.oracle.ai-launchpad.browser
 productName: AI Launchpad for Oracle
 copyright: Copyright (c) 2026
 asar: true
+artifactName: AI.Launchpad.for.Oracle_${version}_${os}_${arch}.${ext}
 directories:
   output: ../../artifacts/browser-client
 files:
@@ -16,23 +17,45 @@ extraMetadata:
   main: out/main/index.js
   description: AI Launchpad for Oracle Browser Client MVP
 win:
+  icon: src/renderer/public/app-icon.ico
   signAndEditExecutable: false
   target:
-    - target: zip
+    - target: nsis
       arch:
         - x64
+    - target: msi
+      arch:
+        - x64
+nsis:
+  artifactName: AI.Launchpad.for.Oracle_${version}_x64_installer.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+msi:
+  artifactName: AI.Launchpad.for.Oracle_${version}_x64_en-US.${ext}
 mac:
+  artifactName: AI.Launchpad.for.Oracle_${version}_universal.${ext}
+  icon: src/renderer/public/app-icon.icns
   target:
-    - target: zip
+    - target: dmg
       arch:
-        - x64
+        - universal
 linux:
+  artifactName: AI.Launchpad.for.Oracle_${version}_${arch}.${ext}
+  icon: src/renderer/public/app-icon.png
   target:
     - target: AppImage
       arch:
         - x64
-    - target: tar.gz
+    - target: deb
+      arch:
+        - x64
+    - target: rpm
       arch:
         - x64
   category: Development
+deb:
+  artifactName: AI.Launchpad.for.Oracle_${version}_amd64.${ext}
+rpm:
+  artifactName: AI.Launchpad.for.Oracle-${version}-1.x86_64.${ext}
 publish: null
