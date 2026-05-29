@@ -192,6 +192,11 @@ import {
   type BrowserShortcutInput
 } from "../../../shared/browserShortcuts";
 import {
+  defaultBrowserViewZoomFactor,
+  getNextBrowserViewZoomFactor,
+  isBrowserViewZoomCommand
+} from "../../../shared/browserViewZoom";
+import {
   closeBrowserTopMenuPanel,
   createBrowserTopMenuState,
   getBrowserTopMenuTitle,
@@ -511,6 +516,7 @@ export function AppShell(): ReactElement {
     isLoading: false
   });
   const [browserOsRoute, setBrowserOsRoute] = useState<BrowserOsRoute>("onboarding");
+  const [browserOsGlobalZoomFactor, setBrowserOsGlobalZoomFactor] = useState(defaultBrowserViewZoomFactor);
   const [agenticModeId, setAgenticModeId] = useState<AgenticModeId>("agent");
   const [browserOsRailCollapsed, setBrowserOsRailCollapsed] = useState(false);
   const [browserOsTabSearchOpen, setBrowserOsTabSearchOpen] = useState(false);
@@ -1465,6 +1471,18 @@ export function AppShell(): ReactElement {
 
   const handleApplyBrowserViewCommand = useCallback(
     (command: BrowserViewCommand) => {
+      if (isBrowserViewZoomCommand(command)) {
+        setBrowserOsGlobalZoomFactor((currentZoomFactor) => getNextBrowserViewZoomFactor(currentZoomFactor, command));
+        setBrowserOsRailStatus(
+          command === "reset_zoom"
+            ? "すべてのページ zoom を 100% に戻しました。"
+            : command === "zoom_in"
+              ? "すべてのページを拡大しました。"
+              : "すべてのページを縮小しました。"
+        );
+        return;
+      }
+
       if (isBrowserOsInternalPage) {
         setBrowserOsRailStatus("Web page を開くと View shortcut を使用できます。");
         return;
@@ -1479,24 +1497,6 @@ export function AppShell(): ReactElement {
       if (command === "force_reload") {
         browserSurfaceRef.current?.forceReload();
         setBrowserOsRailStatus("キャッシュを無視してページを再読み込みしました。");
-        return;
-      }
-
-      if (command === "reset_zoom") {
-        browserSurfaceRef.current?.resetZoom();
-        setBrowserOsRailStatus("ページ zoom を 100% に戻しました。");
-        return;
-      }
-
-      if (command === "zoom_in") {
-        browserSurfaceRef.current?.zoomIn();
-        setBrowserOsRailStatus("ページを拡大しました。");
-        return;
-      }
-
-      if (command === "zoom_out") {
-        browserSurfaceRef.current?.zoomOut();
-        setBrowserOsRailStatus("ページを縮小しました。");
       }
     },
     [isBrowserOsInternalPage]
@@ -2507,6 +2507,7 @@ export function AppShell(): ReactElement {
                 ref={browserSurfaceRef}
                 currentTitle={currentTitle}
                 currentUrl={currentUrl}
+                zoomFactor={browserOsGlobalZoomFactor}
                 sourceType={sourceType}
                 onPageMetadataChange={handlePageMetadataChange}
                 onNavigationStateChange={handleNavigationStateChange}
@@ -5363,7 +5364,7 @@ function BrowserOsOnboardingPage({
         </nav>
       </header>
 
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-auto px-8 pb-8 pt-3">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-start overflow-auto px-8 pb-8 pt-3">
         <div className="max-w-5xl text-center">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#eeeeee] bg-white/95 px-4 py-2 text-base font-medium text-[#6b7280] shadow-sm">
             <span className="h-3 w-3 rounded-full bg-[#f26a2e]" />

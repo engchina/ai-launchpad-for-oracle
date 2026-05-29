@@ -2,7 +2,17 @@ import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  shell,
+  type Input,
+  type MenuItemConstructorOptions,
+  type WebContents
+} from "electron";
 import type {
   AskPagePayload,
   BrowserMcpApprovalDecisionPayload,
@@ -19,6 +29,11 @@ import type {
 } from "../shared/api";
 import { ingestTextDocument, MAX_TEXT_DOCUMENT_BYTES } from "../shared/documentIngestion";
 import { answerRagQuestion, createOracleVectorSearchRagAnswer, normalizeRagQuestion } from "../shared/rag";
+import {
+  getNextBrowserViewZoomFactor,
+  resolveBrowserViewZoomShortcut,
+  type BrowserViewZoomCommand
+} from "../shared/browserViewZoom";
 import { BrowserWorkspaceService } from "./browserWorkspaceService";
 import { BrowserMcpHttpEndpointController } from "./browserMcpHttpEndpointController";
 import { LocalConnectorProcessClient } from "./localConnectorProcessClient";
@@ -50,6 +65,44 @@ function sendBrowserViewCommand(mainWindow: BrowserWindow, command: BrowserViewC
   mainWindow.webContents.send("browser:view-command", command);
 }
 
+function applyAppZoomCommand(mainWindow: BrowserWindow, command: BrowserViewZoomCommand): void {
+  if (mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const currentZoomFactor = mainWindow.webContents.getZoomFactor();
+  const nextZoomFactor = getNextBrowserViewZoomFactor(currentZoomFactor, command);
+
+  mainWindow.webContents.setZoomFactor(nextZoomFactor);
+  sendBrowserViewCommand(mainWindow, command);
+}
+
+function findShortcutTargetWindow(contents: WebContents): BrowserWindow | null {
+  const directWindow = BrowserWindow.fromWebContents(contents);
+  if (directWindow) {
+    return directWindow;
+  }
+
+  return BrowserWindow.fromWebContents(contents.hostWebContents);
+}
+
+function registerBrowserViewZoomShortcuts(contents: WebContents): void {
+  contents.on("before-input-event", (event, input: Input) => {
+    const command = resolveBrowserViewZoomShortcut(input, { isMac: process.platform === "darwin" });
+    if (!command) {
+      return;
+    }
+
+    const targetWindow = findShortcutTargetWindow(contents);
+    if (!targetWindow) {
+      return;
+    }
+
+    event.preventDefault();
+    applyAppZoomCommand(targetWindow, command);
+  });
+}
+
 function configureApplicationMenu(mainWindow: BrowserWindow): void {
   const viewMenu: MenuItemConstructorOptions = {
     label: "View",
@@ -73,17 +126,17 @@ function configureApplicationMenu(mainWindow: BrowserWindow): void {
       {
         label: "Actual Size",
         accelerator: "CmdOrCtrl+0",
-        click: () => sendBrowserViewCommand(mainWindow, "reset_zoom")
+        click: () => applyAppZoomCommand(mainWindow, "reset_zoom")
       },
       {
         label: "Zoom In",
         accelerator: "CmdOrCtrl+Plus",
-        click: () => sendBrowserViewCommand(mainWindow, "zoom_in")
+        click: () => applyAppZoomCommand(mainWindow, "zoom_in")
       },
       {
         label: "Zoom Out",
         accelerator: "CmdOrCtrl+-",
-        click: () => sendBrowserViewCommand(mainWindow, "zoom_out")
+        click: () => applyAppZoomCommand(mainWindow, "zoom_out")
       },
       { type: "separator" },
       {
@@ -200,6 +253,10 @@ app.whenReady().then(() => {
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
+  });
+
+  app.on("web-contents-created", (_, contents) => {
+    registerBrowserViewZoomShortcuts(contents);
   });
 
   ipcMain.handle("browser:list-captures", () => browserWorkspaceService.listCaptures());

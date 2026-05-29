@@ -10,6 +10,7 @@ import {
   useState
 } from "react";
 import { type PageSourceType } from "../../../shared/api";
+import { clampBrowserViewZoomFactor } from "../../../shared/browserViewZoom";
 import { cn } from "@renderer/lib/utils";
 
 type WebviewEvent = Event & {
@@ -41,9 +42,6 @@ export type BrowserSurfaceHandle = {
   goForward: () => void;
   reload: () => void;
   forceReload: () => void;
-  resetZoom: () => void;
-  zoomIn: () => void;
-  zoomOut: () => void;
   getSelectedText: () => Promise<string>;
   getPageMetadata: () => Promise<{ url: string; title: string }>;
   captureScreenshot: () => Promise<string>;
@@ -58,6 +56,7 @@ export type BrowserSurfaceState = {
 type BrowserSurfaceProps = {
   currentTitle: string;
   currentUrl: string;
+  zoomFactor: number;
   sourceType: PageSourceType;
   onPageMetadataChange: (metadata: { url: string; title: string }) => void;
   onNavigationStateChange: (state: BrowserSurfaceState) => void;
@@ -75,21 +74,8 @@ function safeWebviewCall<T>(fallback: T, action: () => T): T {
   }
 }
 
-const defaultZoomFactor = 1;
-const zoomFactorStep = 0.2;
-const minZoomFactor = 0.25;
-const maxZoomFactor = 5;
-
-function clampZoomFactor(value: number): number {
-  return Math.min(maxZoomFactor, Math.max(minZoomFactor, value));
-}
-
-function getWebviewZoomFactor(webview: ElectronWebviewElement): number {
-  return safeWebviewCall(defaultZoomFactor, () => webview.getZoomFactor?.() ?? defaultZoomFactor);
-}
-
 function setWebviewZoomFactor(webview: ElectronWebviewElement, zoomFactor: number): void {
-  safeWebviewCall(undefined, () => webview.setZoomFactor?.(clampZoomFactor(zoomFactor)));
+  safeWebviewCall(undefined, () => webview.setZoomFactor?.(clampBrowserViewZoomFactor(zoomFactor)));
 }
 
 function buildMockScreenshotDataUrl(title: string, url: string): string {
@@ -112,7 +98,7 @@ function buildMockScreenshotDataUrl(title: string, url: string): string {
 }
 
 export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfaceProps>(
-  ({ currentTitle, currentUrl, sourceType, onPageMetadataChange, onNavigationStateChange }, ref): ReactElement => {
+  ({ currentTitle, currentUrl, zoomFactor, sourceType, onPageMetadataChange, onNavigationStateChange }, ref): ReactElement => {
     const webviewRef = useRef<ElectronWebviewElement | null>(null);
     const [loadError, setLoadError] = useState<string>("");
     const canUseWebview = isElectronWebviewAvailable();
@@ -142,24 +128,6 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
           const webview = webviewRef.current;
           if (webview) {
             safeWebviewCall(undefined, () => (webview.reloadIgnoringCache ? webview.reloadIgnoringCache() : webview.reload()));
-          }
-        },
-        resetZoom: () => {
-          const webview = webviewRef.current;
-          if (webview) {
-            setWebviewZoomFactor(webview, defaultZoomFactor);
-          }
-        },
-        zoomIn: () => {
-          const webview = webviewRef.current;
-          if (webview) {
-            setWebviewZoomFactor(webview, getWebviewZoomFactor(webview) + zoomFactorStep);
-          }
-        },
-        zoomOut: () => {
-          const webview = webviewRef.current;
-          if (webview) {
-            setWebviewZoomFactor(webview, getWebviewZoomFactor(webview) - zoomFactorStep);
           }
         },
         getSelectedText: async () => {
@@ -229,6 +197,10 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
         });
       };
 
+      const handleDomReady = (): void => {
+        setWebviewZoomFactor(webview, zoomFactor);
+      };
+
       const handleStopLoading = (): void => {
         syncMetadata();
       };
@@ -243,6 +215,7 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
       };
 
       webview.addEventListener("did-start-loading", handleStartLoading);
+      webview.addEventListener("dom-ready", handleDomReady);
       webview.addEventListener("did-stop-loading", handleStopLoading);
       webview.addEventListener("did-navigate", syncMetadata);
       webview.addEventListener("did-navigate-in-page", syncMetadata);
@@ -251,13 +224,23 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
 
       return () => {
         webview.removeEventListener("did-start-loading", handleStartLoading);
+        webview.removeEventListener("dom-ready", handleDomReady);
         webview.removeEventListener("did-stop-loading", handleStopLoading);
         webview.removeEventListener("did-navigate", syncMetadata);
         webview.removeEventListener("did-navigate-in-page", syncMetadata);
         webview.removeEventListener("page-title-updated", syncMetadata);
         webview.removeEventListener("did-fail-load", handleFailLoad);
       };
-    }, [canUseWebview, currentTitle, currentUrl, onNavigationStateChange, onPageMetadataChange]);
+    }, [canUseWebview, currentTitle, currentUrl, onNavigationStateChange, onPageMetadataChange, zoomFactor]);
+
+    useEffect(() => {
+      const webview = webviewRef.current;
+      if (!canUseWebview || !webview) {
+        return;
+      }
+
+      setWebviewZoomFactor(webview, zoomFactor);
+    }, [canUseWebview, zoomFactor]);
 
     useEffect(() => {
       const webview = webviewRef.current;
