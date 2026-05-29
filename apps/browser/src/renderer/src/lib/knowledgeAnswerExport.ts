@@ -116,6 +116,19 @@ function formatOracleVectorExecution(execution: OracleVectorSearchExecutionResul
     );
   }
 
+  if (execution.rows && execution.rows.length > 0) {
+    lines.push(
+      "",
+      `### Vector Search results (${execution.rows.length})`,
+      "",
+      ...execution.rows.map((row, index) => {
+        const distanceLabel = typeof row.distance === "number" ? ` (distance ${row.distance.toFixed(4)})` : "";
+        const title = row.title ? `${row.title}: ` : "";
+        return `${index + 1}. ${title}${row.chunkText.replace(/\s+/g, " ").trim()}${distanceLabel}`;
+      })
+    );
+  }
+
   return lines;
 }
 

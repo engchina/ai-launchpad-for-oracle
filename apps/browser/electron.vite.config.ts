@@ -9,7 +9,10 @@ export default defineConfig({
         input: {
           index: resolve("src/main/index.ts"),
           localConnectorWorker: resolve("src/main/localConnectorWorker.ts")
-        }
+        },
+        // oracledb / openai は Live モードでのみ動的に読み込む optional dependency。
+        // 未インストール環境でも build が通るよう external 化する。
+        external: ["oracledb", "openai"]
       }
     },
     plugins: [externalizeDepsPlugin()]

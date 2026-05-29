@@ -3,8 +3,6 @@ import { join } from "node:path";
 import { utilityProcess, type UtilityProcess } from "electron";
 import type {
   AdbWalletCheckResult,
-  BrowserMcpLocalConnectorResult,
-  BrowserMcpRequest,
   GeneratePocAssetsPayload,
   GeneratePocAssetsResult,
   LocalConnectorHealth,
@@ -52,10 +50,6 @@ export class LocalConnectorProcessClient {
 
   objectStorageCheck(): Promise<ObjectStorageCheckResult> {
     return this.request("objectStorageCheck", undefined);
-  }
-
-  browserMcpRequest(payload: BrowserMcpRequest): Promise<BrowserMcpLocalConnectorResult> {
-    return this.request("browserMcpRequest", payload);
   }
 
   generatePocAssets(payload: GeneratePocAssetsPayload): Promise<GeneratePocAssetsResult> {

@@ -1,11 +1,4 @@
 import type { IngestTextDocumentResult } from "./documentIngestion";
-import type { BrowserMcpRequest, BrowserMcpResponse } from "./browserMcpProtocol";
-import type {
-  BrowserMcpApprovalDecision,
-  BrowserMcpApprovalDecisionPayload,
-  BrowserMcpApprovalDecisionStatus
-} from "./browserMcpApprovalDecision";
-import type { BrowserSchedulerTaskDraft, BrowserSchedulerTaskPayload } from "./browserSchedulerRegistry";
 import type { OracleVectorSearchExecutionPayload, OracleVectorSearchExecutionResult } from "./oracleVectorSearch";
 import type { RagAskPayload, RagAskResult } from "./rag";
 
@@ -58,71 +51,6 @@ export type {
   BrowserAgentRunStep,
   BrowserAgentRunStepStatus
 } from "./agentRuns";
-
-export type {
-  BrowserToolApproval,
-  BrowserToolCatalogSummary,
-  BrowserToolCategory,
-  BrowserToolCategorySummary,
-  BrowserToolDefinition,
-  BrowserToolRuntimeScope,
-  BrowserToolSafety
-} from "./browserToolCatalog";
-
-export type {
-  BrowserToolInvocationAuditEvent,
-  BrowserToolInvocationDraft,
-  BrowserToolInvocationEventLevel,
-  BrowserToolInvocationPayload,
-  BrowserToolInvocationPreview,
-  BrowserToolInvocationStatus
-} from "./browserToolInvocation";
-
-export type {
-  BrowserToolExecutionMode,
-  BrowserToolExecutionOutput,
-  BrowserToolExecutionPreview,
-  BrowserToolExecutionStatus
-} from "./browserToolExecutor";
-
-export type { BrowserMcpApprovalQueueItem, BrowserMcpApprovalQueueItemStatus } from "./browserMcpApprovalQueue";
-
-export type {
-  BrowserMcpApprovalDecision,
-  BrowserMcpApprovalDecisionPayload,
-  BrowserMcpApprovalDecisionStatus,
-  BrowserMcpExecutionConfirmation
-} from "./browserMcpApprovalDecision";
-
-export type {
-  BrowserMcpErrorResponse,
-  BrowserMcpMethod,
-  BrowserMcpRequest,
-  BrowserMcpRequestBase,
-  BrowserMcpResponse,
-  BrowserMcpSuccessResponse,
-  BrowserMcpToolDescriptor,
-  BrowserMcpToolsCallRequest,
-  BrowserMcpToolsCallResult,
-  BrowserMcpToolsListRequest,
-  BrowserMcpToolsListResult
-} from "./browserMcpProtocol";
-
-export type {
-  BrowserMcpRunHistoryEntry,
-  BrowserMcpRunHistorySchedulePolicy,
-  BrowserMcpRunHistoryStage
-} from "./browserMcpRunHistory";
-
-export type {
-  BrowserScheduleCadence,
-  BrowserSchedulerApprovalPolicy,
-  BrowserSchedulerRegistryPreview,
-  BrowserSchedulerTaskDraft,
-  BrowserSchedulerTaskPayload,
-  BrowserSchedulerTaskSource,
-  BrowserSchedulerTaskStatus
-} from "./browserSchedulerRegistry";
 
 export type CapturedPagePayload = {
   workspaceId: string;
@@ -212,125 +140,6 @@ export type LocalConnectorHealth = {
   connector: "local-connector";
   mode: LocalConnectorMode;
   message?: string;
-};
-
-export type BrowserMcpLocalConnectorSummary = {
-  connector: "local-connector";
-  bridge: "browser-mcp";
-  requestId: string;
-  method: string;
-  status: "ok" | "error";
-  handledAt: string;
-  toolCount?: number;
-  executionStatus?: string;
-  approvalDecisionStatus?: BrowserMcpApprovalDecisionStatus;
-  errorCode?: string;
-};
-
-export type BrowserMcpLocalConnectorResult = {
-  summary: BrowserMcpLocalConnectorSummary;
-  response: BrowserMcpResponse;
-};
-
-export type BrowserMcpEndpointStatus = "stopped" | "starting" | "running" | "error";
-
-export type BrowserMcpEndpointConfig = {
-  host: "127.0.0.1";
-  port: number;
-  endpointPath: string;
-  healthPath: string;
-  streamPath: string;
-};
-
-export type BrowserMcpEndpointStartPayload = {
-  port?: number;
-  endpointPath?: string;
-  healthPath?: string;
-  streamPath?: string;
-};
-
-export type BrowserMcpEndpointState = {
-  status: BrowserMcpEndpointStatus;
-  config: BrowserMcpEndpointConfig;
-  message: string;
-  url?: string;
-  healthUrl?: string;
-  streamUrl?: string;
-  sessionId?: string;
-  startedAt?: string;
-  stoppedAt?: string;
-  error?: string;
-};
-
-export type BrowserMcpAuditEventKind =
-  | "endpoint_started"
-  | "endpoint_stopped"
-  | "endpoint_error"
-  | "health_check"
-  | "stream_preview"
-  | "mcp_request"
-  | "http_error";
-
-export type BrowserMcpAuditEventStatus = "ok" | "error" | "waiting_approval" | "blocked";
-
-export type BrowserMcpAuditEvent = {
-  id: string;
-  kind: BrowserMcpAuditEventKind;
-  status: BrowserMcpAuditEventStatus;
-  occurredAt: string;
-  sessionId?: string;
-  httpMethod?: string;
-  path?: string;
-  httpStatus?: number;
-  requestId?: string;
-  workspaceName?: string;
-  mcpMethod?: string;
-  toolId?: string;
-  toolCount?: number;
-  executionStatus?: string;
-  approvalDecisionId?: string;
-  approvalDecisionStatus?: BrowserMcpApprovalDecisionStatus;
-  errorCode?: string;
-  message?: string;
-};
-
-export type BrowserMcpAuditEventPayload = Omit<BrowserMcpAuditEvent, "id"> & {
-  id?: string;
-};
-
-export type ListBrowserMcpAuditEventsResult = {
-  events: BrowserMcpAuditEvent[];
-};
-
-export type ClearBrowserMcpAuditEventsResult = {
-  ok: true;
-  clearedAt: string;
-};
-
-export type ListBrowserMcpApprovalDecisionsResult = {
-  decisions: BrowserMcpApprovalDecision[];
-};
-
-export type SaveBrowserMcpApprovalDecisionResult = {
-  decision: BrowserMcpApprovalDecision;
-};
-
-export type ClearBrowserMcpApprovalDecisionsResult = {
-  ok: true;
-  clearedAt: string;
-};
-
-export type ListBrowserSchedulerTasksResult = {
-  tasks: BrowserSchedulerTaskDraft[];
-};
-
-export type SaveBrowserSchedulerTaskResult = {
-  task: BrowserSchedulerTaskDraft;
-};
-
-export type ClearBrowserSchedulerTasksResult = {
-  ok: true;
-  clearedAt: string;
 };
 
 export type OciCheckConfigResult = {
@@ -449,23 +258,7 @@ export type AiLaunchpadApi = {
     sqlclCheck: () => Promise<SqlclCheckResult>;
     adbWalletCheck: () => Promise<AdbWalletCheckResult>;
     objectStorageCheck: () => Promise<ObjectStorageCheckResult>;
-    browserMcpRequest: (payload: BrowserMcpRequest) => Promise<BrowserMcpLocalConnectorResult>;
     generatePocAssets: (payload: GeneratePocAssetsPayload) => Promise<GeneratePocAssetsResult>;
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) => Promise<OracleVectorSearchExecutionResult>;
-  };
-  browserMcpEndpoint: {
-    status: () => Promise<BrowserMcpEndpointState>;
-    start: (payload?: BrowserMcpEndpointStartPayload) => Promise<BrowserMcpEndpointState>;
-    stop: () => Promise<BrowserMcpEndpointState>;
-    auditEvents: () => Promise<ListBrowserMcpAuditEventsResult>;
-    clearAuditEvents: () => Promise<ClearBrowserMcpAuditEventsResult>;
-    approvalDecisions: () => Promise<ListBrowserMcpApprovalDecisionsResult>;
-    saveApprovalDecision: (payload: BrowserMcpApprovalDecisionPayload) => Promise<SaveBrowserMcpApprovalDecisionResult>;
-    clearApprovalDecisions: () => Promise<ClearBrowserMcpApprovalDecisionsResult>;
-  };
-  schedulerRegistry: {
-    listTasks: () => Promise<ListBrowserSchedulerTasksResult>;
-    saveTask: (payload: BrowserSchedulerTaskPayload) => Promise<SaveBrowserSchedulerTaskResult>;
-    clearTasks: () => Promise<ClearBrowserSchedulerTasksResult>;
   };
 };

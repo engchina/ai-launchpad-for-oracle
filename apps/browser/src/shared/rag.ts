@@ -59,6 +59,7 @@ export type RagAskResult = {
   adapter: RagAdapterId;
   adapterStatus?: RagAdapterStatus;
   oracleVectorSearch?: OracleVectorSearchExecutionResult;
+  answerProvider?: "deterministic" | "oci-genai";
   latencyMs?: number;
 };
 
@@ -231,6 +232,31 @@ export function createOracleVectorSearchRagAnswer(
   latencyMs?: number
 ): RagAskResult {
   const normalizedQuestion = normalizeRagQuestion(payload.question);
+
+  if (execution.status === "executed") {
+    const rows = execution.rows ?? [];
+    const sourceSummary = rows
+      .map((row, index) => {
+        const distanceLabel = typeof row.distance === "number" ? `, distance ${row.distance.toFixed(4)}` : "";
+        return `#${index + 1} ${row.title ?? row.chunkText.slice(0, 40)}${distanceLabel}`;
+      })
+      .join(" / ");
+
+    return {
+      question: normalizedQuestion,
+      answer:
+        rows.length > 0
+          ? `${execution.message} 質問「${normalizedQuestion}」に対し、Oracle AI Vector Search が ${rows.length} 件の根拠を返しました: ${sourceSummary}`
+          : `${execution.message} 一致する vector 近傍は見つかりませんでした。`,
+      results: [],
+      status: "answered",
+      adapter: "oracle-vector-search",
+      adapterStatus: "ready",
+      oracleVectorSearch: execution,
+      latencyMs
+    };
+  }
+
   const adapterStatus =
     execution.status === "dry_run"
       ? "dry_run"

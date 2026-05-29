@@ -8,7 +8,20 @@ export type OracleVectorSearchConfig = {
   configured: boolean;
 };
 
-export type OracleVectorSearchExecutionStatus = "not_configured" | "invalid_config" | "dry_run" | "unavailable";
+export type OracleVectorSearchExecutionStatus =
+  | "not_configured"
+  | "invalid_config"
+  | "dry_run"
+  | "executed"
+  | "unavailable";
+
+export type OracleVectorSearchRow = {
+  chunkText: string;
+  distance?: number;
+  id?: string;
+  title?: string;
+  sourceUrl?: string;
+};
 
 export type OracleVectorSearchBindVariable = {
   name: string;
@@ -49,6 +62,7 @@ export type OracleVectorSearchExecutionResult = {
   status: OracleVectorSearchExecutionStatus;
   message: string;
   plan?: OracleVectorSearchPlan;
+  rows?: OracleVectorSearchRow[];
   readinessChecks?: OracleVectorSearchReadinessCheck[];
   validationErrors?: string[];
   latencyMs: number;

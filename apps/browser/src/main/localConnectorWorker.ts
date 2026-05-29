@@ -1,5 +1,4 @@
 import type {
-  BrowserMcpRequest,
   GeneratePocAssetsPayload,
   LocalConnectorHealth,
   OracleVectorSearchExecutionPayload,
@@ -7,11 +6,11 @@ import type {
 } from "../shared/api";
 import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
 import { checkAdbWallet } from "./adbWalletProbe";
-import { handleLocalConnectorBrowserMcp } from "./localConnectorBrowserMcp";
 import { checkObjectStorage } from "./objectStorageProbe";
 import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
 import { generatePocAssets } from "./pocAssetGenerator";
 import { createOracleVectorSearchReadinessChecks } from "./oracleVectorSearchReadiness";
+import { executeLiveOracleVectorSearch } from "./oracleVectorSearchExecutor";
 import { checkSqlcl } from "./sqlclProbe";
 import type {
   LocalConnectorRequest,
@@ -49,10 +48,32 @@ async function executeOracleVectorSearchWithReadiness(
   }
 
   const [ociConfig, sqlcl, adbWallet] = await Promise.all([probeOciConfig(), checkSqlcl(), checkAdbWallet()]);
+  const readinessChecks = createOracleVectorSearchReadinessChecks(ociConfig, sqlcl, adbWallet);
+
+  // plan が valid な場合のみ live 実行を試みる。credential / driver 未整備なら dry-run に fallback する。
+  if (execution.plan) {
+    const live = await executeLiveOracleVectorSearch(execution.plan, payload.question, process.env);
+    if (live.ok) {
+      return {
+        ...execution,
+        status: "executed",
+        message: "Oracle Vector Search を Oracle AI Database に対して実行しました。",
+        rows: live.rows,
+        readinessChecks,
+        executedAt: new Date().toISOString()
+      };
+    }
+
+    return {
+      ...execution,
+      readinessChecks,
+      validationErrors: [...(execution.validationErrors ?? []), `live 実行は fallback しました: ${live.reason}`]
+    };
+  }
 
   return {
     ...execution,
-    readinessChecks: createOracleVectorSearchReadinessChecks(ociConfig, sqlcl, adbWallet)
+    readinessChecks
   };
 }
 
@@ -77,10 +98,6 @@ async function handleRequest<T extends LocalConnectorRequestType>(
 
   if (request.type === "objectStorageCheck") {
     return checkObjectStorage() as LocalConnectorResponsePayloadByType[T];
-  }
-
-  if (request.type === "browserMcpRequest" && request.payload) {
-    return handleLocalConnectorBrowserMcp(request.payload as BrowserMcpRequest) as LocalConnectorResponsePayloadByType[T];
   }
 
   if (request.type === "generatePocAssets" && request.payload) {

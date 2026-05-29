@@ -15,13 +15,9 @@ import {
 } from "electron";
 import type {
   AskPagePayload,
-  BrowserMcpApprovalDecisionPayload,
-  BrowserMcpEndpointStartPayload,
   BrowserViewCommand,
-  BrowserSchedulerTaskPayload,
   CapturedPagePayload,
   OracleVectorSearchExecutionPayload,
-  BrowserMcpRequest,
   RagAskResult,
   RagAskPayload,
   SaveScreenshotPayload,
@@ -35,22 +31,18 @@ import {
   type BrowserViewZoomCommand
 } from "../shared/browserViewZoom";
 import { BrowserWorkspaceService } from "./browserWorkspaceService";
-import { BrowserMcpHttpEndpointController } from "./browserMcpHttpEndpointController";
 import { LocalConnectorProcessClient } from "./localConnectorProcessClient";
 import {
   clearStoredKnowledgeDocuments,
   listStoredKnowledgeDocuments,
   saveKnowledgeDocument
 } from "./localKnowledgeStore";
-import { clearBrowserSchedulerTasks, listBrowserSchedulerTasks, upsertBrowserSchedulerTask } from "./localBrowserSchedulerStore";
+import { generateOciGenAiAnswer, type GenAiContext } from "./ociGenAiExecutor";
 
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
 
 const localConnector = new LocalConnectorProcessClient();
-const browserMcpEndpoint = new BrowserMcpHttpEndpointController({
-  getStoreBaseDir: getLocalStoreBaseDir
-});
 const browserWorkspaceService = new BrowserWorkspaceService(getLocalStoreBaseDir);
 
 function getLocalStoreBaseDir(): string {
@@ -212,9 +204,39 @@ function createWindow(): void {
   }
 }
 
+function collectGenAiContexts(result: RagAskResult): GenAiContext[] {
+  const fromResults: GenAiContext[] = result.results.map((item) => ({
+    title: item.chunk.title,
+    ...(item.chunk.sourceUrl ? { sourceUrl: item.chunk.sourceUrl } : {}),
+    text: item.excerpt || item.chunk.text
+  }));
+  const fromRows: GenAiContext[] = (result.oracleVectorSearch?.rows ?? []).map((row) => ({
+    ...(row.title ? { title: row.title } : {}),
+    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl } : {}),
+    text: row.chunkText
+  }));
+  return [...fromResults, ...fromRows].filter((context) => context.text.trim().length > 0);
+}
+
+// 検索済み context がある場合のみ、OCI GenAI で回答本文を実生成に差し替える。
+// 無効・未設定・失敗時は deterministic answer をそのまま返す。
+async function enrichAnswerWithOciGenAi(result: RagAskResult): Promise<RagAskResult> {
+  const contexts = collectGenAiContexts(result);
+  if (contexts.length === 0) {
+    return result;
+  }
+
+  const generation = await generateOciGenAiAnswer(result.question, contexts, process.env);
+  if (!generation.ok) {
+    return result;
+  }
+
+  return { ...result, answer: generation.answer, answerProvider: "oci-genai" };
+}
+
 async function handleAskKnowledge(payload: RagAskPayload): Promise<RagAskResult> {
   if (payload.adapter !== "oracle-vector-search") {
-    return answerRagQuestion(payload);
+    return enrichAnswerWithOciGenAi(answerRagQuestion(payload));
   }
 
   const startedAt = performance.now();
@@ -227,7 +249,7 @@ async function handleAskKnowledge(payload: RagAskPayload): Promise<RagAskResult>
       maxResults: payload.maxResults
     });
 
-    return createOracleVectorSearchRagAnswer(
+    const baseResult = createOracleVectorSearchRagAnswer(
       {
         ...payload,
         question
@@ -235,6 +257,8 @@ async function handleAskKnowledge(payload: RagAskPayload): Promise<RagAskResult>
       oracleVectorSearch,
       Math.round(performance.now() - startedAt)
     );
+
+    return await enrichAnswerWithOciGenAi(baseResult);
   } catch {
     return {
       question,
@@ -338,42 +362,6 @@ app.whenReady().then(() => {
 
   ipcMain.handle("local-connector:object-storage-check", () => localConnector.objectStorageCheck());
 
-  ipcMain.handle("local-connector:browser-mcp-request", (_, payload: BrowserMcpRequest) => localConnector.browserMcpRequest(payload));
-
-  ipcMain.handle("browser-mcp-endpoint:status", () => browserMcpEndpoint.status());
-
-  ipcMain.handle("browser-mcp-endpoint:start", (_, payload?: BrowserMcpEndpointStartPayload) => browserMcpEndpoint.start(payload));
-
-  ipcMain.handle("browser-mcp-endpoint:stop", () => browserMcpEndpoint.stop());
-
-  ipcMain.handle("browser-mcp-endpoint:audit-events", () => browserMcpEndpoint.listAuditEvents());
-
-  ipcMain.handle("browser-mcp-endpoint:clear-audit-events", () => browserMcpEndpoint.clearAuditEvents());
-
-  ipcMain.handle("browser-mcp-endpoint:approval-decisions", () => browserMcpEndpoint.listApprovalDecisions());
-
-  ipcMain.handle("browser-mcp-endpoint:save-approval-decision", (_, payload: BrowserMcpApprovalDecisionPayload) =>
-    browserMcpEndpoint.saveApprovalDecision(payload)
-  );
-
-  ipcMain.handle("browser-mcp-endpoint:clear-approval-decisions", () => browserMcpEndpoint.clearApprovalDecisions());
-
-  ipcMain.handle("scheduler-registry:list-tasks", async () => ({
-    tasks: await listBrowserSchedulerTasks(getLocalStoreBaseDir())
-  }));
-
-  ipcMain.handle("scheduler-registry:save-task", async (_, payload: BrowserSchedulerTaskPayload) => ({
-    task: await upsertBrowserSchedulerTask(getLocalStoreBaseDir(), payload)
-  }));
-
-  ipcMain.handle("scheduler-registry:clear-tasks", async () => {
-    await clearBrowserSchedulerTasks(getLocalStoreBaseDir());
-    return {
-      ok: true,
-      clearedAt: new Date().toISOString()
-    };
-  });
-
   ipcMain.handle("local-connector:generate-poc-assets", (_, payload) => localConnector.generatePocAssets(payload));
 
   ipcMain.handle("local-connector:oracle-vector-search", (_, payload: OracleVectorSearchExecutionPayload) =>
@@ -391,7 +379,6 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   localConnector.dispose();
-  void browserMcpEndpoint.dispose();
 });
 
 app.on("window-all-closed", () => {

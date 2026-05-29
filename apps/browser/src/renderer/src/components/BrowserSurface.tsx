@@ -26,7 +26,7 @@ type ElectronWebviewElement = HTMLElement & {
   goForward: () => void;
   reload: () => void;
   reloadIgnoringCache?: () => void;
-  loadURL: (url: string) => void;
+  loadURL: (url: string) => Promise<void> | void;
   getURL: () => string;
   getTitle: () => string;
   getZoomFactor?: () => number;
@@ -78,6 +78,17 @@ function setWebviewZoomFactor(webview: ElectronWebviewElement, zoomFactor: numbe
   safeWebviewCall(undefined, () => webview.setZoomFactor?.(clampBrowserViewZoomFactor(zoomFactor)));
 }
 
+function loadWebviewUrl(webview: ElectronWebviewElement, url: string): void {
+  safeWebviewCall(undefined, () => {
+    const result = webview.loadURL(url);
+    if (result && typeof (result as Promise<void>).catch === "function") {
+      // 後続ナビゲーションで中断された読み込み (ERR_ABORTED 等) の rejection を
+      // 握りつぶし、main プロセスへ未処理例外が伝播するのを防ぐ。
+      (result as Promise<void>).catch(() => undefined);
+    }
+  });
+}
+
 function buildMockScreenshotDataUrl(title: string, url: string): string {
   const safeTitle = title.replace(/[<>&"]/g, "");
   const safeUrl = url.replace(/[<>&"]/g, "");
@@ -100,6 +111,8 @@ function buildMockScreenshotDataUrl(title: string, url: string): string {
 export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfaceProps>(
   ({ currentTitle, currentUrl, zoomFactor, sourceType, onPageMetadataChange, onNavigationStateChange }, ref): ReactElement => {
     const webviewRef = useRef<ElectronWebviewElement | null>(null);
+    // src 属性で初期 URL を読み込むため、初回マウント時の重複 loadURL を避ける。
+    const lastRequestedUrlRef = useRef<string>(currentUrl);
     const [loadError, setLoadError] = useState<string>("");
     const canUseWebview = isElectronWebviewAvailable();
 
@@ -248,9 +261,14 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
         return;
       }
 
+      if (!currentUrl || currentUrl === lastRequestedUrlRef.current) {
+        return;
+      }
+      lastRequestedUrlRef.current = currentUrl;
+
       const loadedUrl = safeWebviewCall("", () => webview.getURL());
-      if (currentUrl && loadedUrl !== currentUrl) {
-        safeWebviewCall(undefined, () => webview.loadURL(currentUrl));
+      if (loadedUrl !== currentUrl) {
+        loadWebviewUrl(webview, currentUrl);
       }
     }, [canUseWebview, currentUrl]);
 

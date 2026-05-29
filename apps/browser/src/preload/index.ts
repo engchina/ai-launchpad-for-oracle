@@ -2,10 +2,6 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type {
   AiLaunchpadApi,
   AskPagePayload,
-  BrowserMcpApprovalDecisionPayload,
-  BrowserMcpEndpointStartPayload,
-  BrowserMcpRequest,
-  BrowserSchedulerTaskPayload,
   BrowserViewCommand,
   CapturedPagePayload,
   GeneratePocAssetsPayload,
@@ -50,26 +46,9 @@ const api: AiLaunchpadApi = {
     sqlclCheck: () => ipcRenderer.invoke("local-connector:sqlcl-check"),
     adbWalletCheck: () => ipcRenderer.invoke("local-connector:adb-wallet-check"),
     objectStorageCheck: () => ipcRenderer.invoke("local-connector:object-storage-check"),
-    browserMcpRequest: (payload: BrowserMcpRequest) => ipcRenderer.invoke("local-connector:browser-mcp-request", payload),
     generatePocAssets: (payload: GeneratePocAssetsPayload) => ipcRenderer.invoke("local-connector:generate-poc-assets", payload),
     oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) =>
       ipcRenderer.invoke("local-connector:oracle-vector-search", payload)
-  },
-  browserMcpEndpoint: {
-    status: () => ipcRenderer.invoke("browser-mcp-endpoint:status"),
-    start: (payload?: BrowserMcpEndpointStartPayload) => ipcRenderer.invoke("browser-mcp-endpoint:start", payload),
-    stop: () => ipcRenderer.invoke("browser-mcp-endpoint:stop"),
-    auditEvents: () => ipcRenderer.invoke("browser-mcp-endpoint:audit-events"),
-    clearAuditEvents: () => ipcRenderer.invoke("browser-mcp-endpoint:clear-audit-events"),
-    approvalDecisions: () => ipcRenderer.invoke("browser-mcp-endpoint:approval-decisions"),
-    saveApprovalDecision: (payload: BrowserMcpApprovalDecisionPayload) =>
-      ipcRenderer.invoke("browser-mcp-endpoint:save-approval-decision", payload),
-    clearApprovalDecisions: () => ipcRenderer.invoke("browser-mcp-endpoint:clear-approval-decisions")
-  },
-  schedulerRegistry: {
-    listTasks: () => ipcRenderer.invoke("scheduler-registry:list-tasks"),
-    saveTask: (payload: BrowserSchedulerTaskPayload) => ipcRenderer.invoke("scheduler-registry:save-task", payload),
-    clearTasks: () => ipcRenderer.invoke("scheduler-registry:clear-tasks")
   }
 };
 
