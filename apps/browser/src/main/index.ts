@@ -46,6 +46,7 @@ import {
   saveOciGenAiSettings,
   type OciGenAiSecretCodec
 } from "./ociGenAiSettingsStore";
+import { checkForAppUpdate, openUpdateUrl } from "./update";
 
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
@@ -388,6 +389,9 @@ app.whenReady().then(() => {
     settings: await clearOciGenAiApiKey(getLocalStoreBaseDir(), createOciGenAiSecretCodec()),
     clearedAt: new Date().toISOString()
   }));
+
+  ipcMain.handle("update:check-for-update", () => checkForAppUpdate());
+  ipcMain.handle("update:open-url", (_, url: string) => openUpdateUrl(url));
 
   createWindow();
 

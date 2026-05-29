@@ -87,6 +87,21 @@ export type ClearTextDocumentsResult = {
   clearedAt: string;
 };
 
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseUrl: string;
+  downloadUrl: string | null;
+  assetName: string | null;
+  releaseNotes: string;
+  publishedAt: string | null;
+}
+
+export type AvailableRelease = UpdateCheckResult & {
+  hasUpdate: true;
+};
+
 export type LocalConnectorStatus = "mock-ready" | "ready" | "unavailable";
 export type LocalConnectorMode = "not-connected" | "connected" | "error";
 
@@ -202,5 +217,9 @@ export type AiLaunchpadApi = {
     save: (payload: SaveOciGenAiSettingsPayload) => Promise<SaveOciGenAiSettingsResult>;
     test: () => Promise<TestOciGenAiSettingsResult>;
     clearApiKey: () => Promise<ClearOciGenAiApiKeyResult>;
+  };
+  updateApi: {
+    checkForAppUpdate: () => Promise<UpdateCheckResult>;
+    openUpdateUrl: (url: string) => Promise<void>;
   };
 };

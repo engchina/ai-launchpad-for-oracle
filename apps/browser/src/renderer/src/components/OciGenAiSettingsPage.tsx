@@ -1,6 +1,8 @@
 import { Activity, CheckCircle2, KeyRound, Save, Settings as SettingsIcon, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import { type FormEvent, type ReactElement, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@renderer/components/ui/button";
+import { useUpdateStore } from "@renderer/store/update";
+import { runManualUpdateCheck } from "@renderer/lib/updateActions";
 import { Input } from "@renderer/components/ui/input";
 import type { OciGenAiSettingsState, SaveOciGenAiSettingsPayload } from "../../../shared/api";
 
@@ -28,6 +30,10 @@ function formatStorageKind(kind: OciGenAiSettingsState["storageKind"]): string {
 }
 
 export function OciGenAiSettingsPage({ onStatusChange }: OciGenAiSettingsPageProps): ReactElement {
+  const autoCheckEnabled = useUpdateStore((state) => state.autoCheckEnabled);
+  const setAutoCheckEnabled = useUpdateStore((state) => state.setAutoCheckEnabled);
+  const isChecking = useUpdateStore((state) => state.isChecking);
+
   const [settingsState, setSettingsState] = useState<OciGenAiSettingsState | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
@@ -38,6 +44,18 @@ export function OciGenAiSettingsPage({ onStatusChange }: OciGenAiSettingsPagePro
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const formRef = useRef<HTMLFormElement | null>(null);
+
+  const handleManualCheck = async () => {
+    setError("");
+    setMessage("");
+    await runManualUpdateCheck((msg, isErr) => {
+      if (isErr) {
+        setError(msg);
+      } else {
+        setMessage(msg);
+      }
+    });
+  };
 
   const desktopAvailable = Boolean(window.aiLaunchpad?.ociGenAiSettings);
   const busy = loading || testing;
@@ -326,6 +344,36 @@ export function OciGenAiSettingsPage({ onStatusChange }: OciGenAiSettingsPagePro
               <p className="text-xs leading-5 text-[#71717a]">
                 参考実装と同様に、接続情報は AI 専用 settings として扱い、general workspace state には API key を混ぜません。
               </p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#e5e5e5] bg-white p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <SettingsIcon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[#f05a24]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#171717]">アプリのアップデート</p>
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#71717a]">自動チェック</span>
+                    <input
+                      type="checkbox"
+                      checked={autoCheckEnabled}
+                      onChange={(e) => setAutoCheckEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={handleManualCheck}
+                    disabled={isChecking}
+                  >
+                    {isChecking ? "チェック中..." : "アップデートを確認"}
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>
         </aside>

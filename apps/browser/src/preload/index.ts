@@ -47,6 +47,10 @@ const api: AiLaunchpadApi = {
     save: (payload: SaveOciGenAiSettingsPayload) => ipcRenderer.invoke("oci-genai-settings:save", payload),
     test: () => ipcRenderer.invoke("oci-genai-settings:test"),
     clearApiKey: () => ipcRenderer.invoke("oci-genai-settings:clear-api-key")
+  },
+  updateApi: {
+    checkForAppUpdate: () => ipcRenderer.invoke("update:check-for-update"),
+    openUpdateUrl: (url: string) => ipcRenderer.invoke("update:open-url", url)
   }
 };
 

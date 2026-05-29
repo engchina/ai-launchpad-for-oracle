@@ -35,6 +35,9 @@ import {
 import { BrowserSurface, type BrowserSurfaceHandle, type BrowserSurfaceState } from "@renderer/components/BrowserSurface";
 import { OciGenAiSettingsPage } from "@renderer/components/OciGenAiSettingsPage";
 import { Button } from "@renderer/components/ui/button";
+import { useUpdateStore } from "@renderer/store/update";
+import { maybeRunAutomaticUpdateCheck } from "@renderer/lib/updateActions";
+import UpdateAvailableDialog from "@renderer/components/Updates/UpdateAvailableDialog";
 import { Input } from "@renderer/components/ui/input";
 import { agenticModes, type AgenticModeId } from "@renderer/data/agenticOs";
 import { defaultUrl, type CapturedPage, detectSourceType, mockWorkspaces, titleForUrl } from "@renderer/data/mockData";
@@ -126,6 +129,7 @@ export function AppShell(): ReactElement {
     addCapture,
     clearCaptures
   } = useLaunchpadStore();
+  const updateDialogOpen = useUpdateStore((state) => state.dialogOpen);
   const browserSurfaceRef = useRef<BrowserSurfaceHandle>(null);
   const browserOsTopMenuRef = useRef<HTMLDivElement>(null);
   const [draftUrl, setDraftUrl] = useState(currentUrl);
@@ -208,6 +212,10 @@ export function AppShell(): ReactElement {
       canceled = true;
     };
   }, [hydrateCaptures]);
+
+  useEffect(() => {
+    void maybeRunAutomaticUpdateCheck();
+  }, []);
 
   const currentContext = useMemo(
     () => ({
@@ -935,6 +943,7 @@ export function AppShell(): ReactElement {
         </div>
         )}
       </main>
+      {updateDialogOpen && <UpdateAvailableDialog />}
     </div>
   );
 }
