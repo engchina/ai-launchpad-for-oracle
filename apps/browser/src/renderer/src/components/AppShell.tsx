@@ -1,21 +1,13 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Bot,
   BookOpen,
   BrainCircuit,
   Camera,
-  ChevronDown,
-  CheckSquare,
-  ClipboardList,
   Copy,
-  Database,
-  DatabaseZap,
   FileDown,
   FileText,
   Globe2,
-  Headphones,
-  ListPlus,
   LayoutDashboard,
   MessageSquare,
   PanelLeftClose,
@@ -23,16 +15,15 @@ import {
   RefreshCw,
   Save,
   Search,
+  Send,
+  Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
   TextSelect,
-  Upload,
-  Users,
   X,
   type LucideIcon
 } from "lucide-react";
 import {
-  type ChangeEvent,
   type FormEvent,
   type ReactElement,
   useCallback,
@@ -42,10 +33,11 @@ import {
   useState
 } from "react";
 import { BrowserSurface, type BrowserSurfaceHandle, type BrowserSurfaceState } from "@renderer/components/BrowserSurface";
+import { OciGenAiSettingsPage } from "@renderer/components/OciGenAiSettingsPage";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { agenticModes, type AgenticModeId } from "@renderer/data/agenticOs";
-import { defaultUrl, type CapturedPage, detectSourceType, mockPlaybooks, mockWorkspaces, titleForUrl } from "@renderer/data/mockData";
+import { defaultUrl, type CapturedPage, detectSourceType, mockWorkspaces, titleForUrl } from "@renderer/data/mockData";
 import {
   formatCaptureCopyText,
   formatCaptureKind,
@@ -56,25 +48,9 @@ import {
 import {
   answerKnowledgeQuestion,
   createKnowledgeChunks,
-  type KnowledgeChunk,
-  type KnowledgeSearchResult
+  type GroundedKnowledgeAnswer
 } from "@renderer/lib/knowledge";
-import {
-  createKnowledgeAnswerFileName,
-  createOracleVectorSqlFileName,
-  formatKnowledgeAnswerMarkdown
-} from "@renderer/lib/knowledgeAnswerExport";
-import type {
-  AdbWalletCheckResult,
-  BrowserViewCommand,
-  GeneratedPocAsset,
-  GeneratePocAssetsResult,
-  LocalConnectorHealth,
-  ObjectStorageCheckResult,
-  OciCheckConfigResult,
-  OracleVectorSearchExecutionResult,
-  SqlclCheckResult
-} from "../../../shared/api";
+import type { BrowserViewCommand } from "../../../shared/api";
 import {
   closeBrowserAssistantPanel,
   createBrowserAssistantPanelState,
@@ -82,14 +58,6 @@ import {
   shouldRenderBrowserAssistantPanel,
   type BrowserAssistantPanelTrigger
 } from "../../../shared/browserAssistantPanel";
-import {
-  clearBrowserAssistantContext,
-  createBrowserAssistantContextState,
-  formatBrowserAssistantContextPrompt,
-  getBrowserAssistantContextSourceLabel,
-  summarizeBrowserAssistantContext,
-  type BrowserAssistantContextItem
-} from "../../../shared/browserAssistantContext";
 import {
   createBrowserRailLocalTabDraft,
   createBrowserRailSections,
@@ -106,12 +74,6 @@ import {
   getNextBrowserViewZoomFactor,
   isBrowserViewZoomCommand
 } from "../../../shared/browserViewZoom";
-import {
-  ingestTextDocument,
-  MAX_TEXT_DOCUMENT_BYTES,
-  type IngestTextDocumentResult
-} from "../../../shared/documentIngestion";
-import type { OracleVectorSearchConfig, RagAdapterId } from "../../../shared/rag";
 import { cn } from "@renderer/lib/utils";
 import { useLaunchpadStore } from "@renderer/store/useLaunchpadStore";
 
@@ -138,137 +100,7 @@ function createPreviewCaptureResult(capture: Omit<CapturedPage, "id" | "savedAt"
   };
 }
 
-function createPreviewPocAssetsResult(workspaceName: string, playbookTitle: string): GeneratePocAssetsResult {
-  return {
-    status: "generated",
-    message: "renderer preview の PoC asset templates です。実行や外部接続は行っていません。",
-    generatedAt: new Date().toISOString(),
-    warnings: ["renderer preview では Local Connector を呼び出していません。"],
-    assets: [
-      {
-        kind: "readme",
-        fileName: "README.md",
-        title: "PoC README",
-        content: `# ${workspaceName}\n\n## Playbook\n\n${playbookTitle}\n\n## Safety\n\n- Secret、wallet、private key は含めない`
-      },
-      {
-        kind: "proposal",
-        fileName: "proposal.md",
-        title: "Proposal section draft",
-        content: `# ${workspaceName} Proposal Section\n\n${playbookTitle} をベースに PoC の提案要旨、期待効果、確認が必要な前提を整理します。`
-      },
-      {
-        kind: "email",
-        fileName: "follow_up_email.md",
-        title: "Follow-up email draft",
-        content: `件名: ${workspaceName} PoC package の次アクション確認\n\n本日は ${playbookTitle} の PoC 準備についてお時間をいただき、ありがとうございました。\n\n次回までに data scope、ADB / Object Storage / IAM readiness、成功条件を確認します。`
-      },
-      {
-        kind: "diagram",
-        fileName: "architecture/architecture.mmd",
-        title: "Mermaid architecture diagram",
-        content: `flowchart LR\n  user["Business user / Pre-sales"]\n  browser["AI Launchpad Browser Client"]\n  docs["Oracle Docs / Captured pages"]\n  objectStorage["OCI Object Storage"]\n  db["Oracle AI Database 26ai"]\n  genai["OCI Generative AI"]\n  package["PoC package"]\n\n  user --> browser\n  browser --> docs\n  browser --> package\n  docs --> objectStorage\n  objectStorage --> db\n  genai --> db\n  db --> browser\n  browser --> user`
-      },
-      {
-        kind: "env",
-        fileName: ".env.example",
-        title: "Environment variable template",
-        content:
-          "OCI_CLI_PROFILE=DEFAULT\nOCI_REGION=ap-tokyo-1\nOCI_OBJECT_STORAGE_NAMESPACE=<object-storage-namespace>\nOCI_OBJECT_STORAGE_BUCKET=<object-storage-bucket>\nSQLCL_PATH=<path-to-sqlcl>\nADB_WALLET_PATH=<path-to-wallet>\nTNS_ADMIN=<path-to-wallet-directory>"
-      },
-      {
-        kind: "demo",
-        fileName: "demo_script.md",
-        title: "Demo script",
-        content: `# ${workspaceName} Demo Script\n\n- ${playbookTitle} の目的と PoC flow を説明する\n- Knowledge source、SQL preview、Mermaid diagram、checklist を順番に確認する\n- owner、期限、fallback 方針を整理する`
-      },
-      {
-        kind: "sql",
-        fileName: "sql/setup_vector_search.sql",
-        title: "AI Vector Search SQL",
-        content: "-- AI Vector Search SQL template\nCREATE TABLE AI_LAUNCHPAD_CHUNKS (ID NUMBER, CHUNK_TEXT CLOB, VECTOR_EMBEDDING VECTOR);"
-      },
-      {
-        kind: "python",
-        fileName: "python/ingest_documents.py",
-        title: "Document ingestion Python",
-        content:
-          "def main() -> None:\n    print(\"Prepare document ingestion, chunking, embedding, and DB insert steps.\")\n\n\nif __name__ == \"__main__\":\n    main()"
-      },
-      {
-        kind: "terraform",
-        fileName: "terraform/object_storage.tf",
-        title: "Object Storage Terraform",
-        content:
-          "variable \"compartment_id\" {\n  type = string\n}\n\nresource \"oci_objectstorage_bucket\" \"poc_bucket\" {\n  compartment_id = var.compartment_id\n  name           = \"ai-launchpad-poc\"\n  access_type    = \"NoPublicAccess\"\n}"
-      },
-      {
-        kind: "checklist",
-        fileName: "checklist.md",
-        title: "PoC validation checklist",
-        content: `# ${workspaceName} PoC Checklist\n\n- [ ] Playbook の前提を確認する\n- [ ] SQL、Python、Terraform template をレビューする\n- [ ] secret、wallet、private key が含まれていないことを確認する`
-      },
-      {
-        kind: "troubleshooting",
-        fileName: "troubleshooting.md",
-        title: "Troubleshooting guide",
-        content: `# ${workspaceName} Troubleshooting Guide\n\n- Local Connector、OCI config、Object Storage、ADB wallet、SQLcl の状態を確認する\n- 実 DB 接続が未準備の場合は SQL preview と Mermaid diagram で demo flow を説明する\n- 失敗時は原因、owner、次回確認事項を follow-up email に追記する`
-      },
-      {
-        kind: "handover",
-        fileName: "handover.md",
-        title: "Handover document",
-        content: `# ${workspaceName} Handover Document\n\n## Included assets\n\n- README / proposal / follow-up email\n- Mermaid architecture diagram\n- SQL / Python / Terraform starter templates\n- .env.example / checklist / troubleshooting guide\n\n## Open items\n\n- [ ] compartment、IAM policy、network、ADB wallet の owner を確定する\n- [ ] PoC 成功条件、fallback、期限を顧客と合意する`
-      }
-    ]
-  };
-}
-
-function formatPocAssetPackage(result: GeneratePocAssetsResult): string {
-  return result.assets
-    .map((asset) => [`# ${asset.fileName}`, "", asset.content].join("\n"))
-    .join("\n\n---\n\n");
-}
-
-function createPocPackageFileName(workspaceName: string, generatedAt: string): string {
-  const safeWorkspaceName =
-    workspaceName
-      .trim()
-      .split("")
-      .map((character) => (character.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(character) ? "-" : character))
-      .join("")
-      .replace(/\s+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "poc-package";
-  const safeDate = generatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10);
-
-  return `${safeWorkspaceName}-poc-package-${safeDate}.md`;
-}
-
-function downloadTextFile(fileName: string, content: string): void {
-  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.rel = "noopener";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-type LocalConnectorDiagnostic = {
-  health: LocalConnectorHealth;
-  ociConfig: OciCheckConfigResult;
-  sqlcl: SqlclCheckResult;
-  adbWallet: AdbWalletCheckResult;
-  objectStorage: ObjectStorageCheckResult;
-  checkedAt: string;
-};
-
-type BrowserOsRoute = "onboarding" | "workspace";
+type BrowserOsRoute = "onboarding" | "workspace" | "settings";
 
 type BrowserOsPageTabTarget = {
   url: string;
@@ -277,22 +109,9 @@ type BrowserOsPageTabTarget = {
 
 type BrowserOsAssistantPanelOpenTrigger = Exclude<BrowserAssistantPanelTrigger, "close">;
 
-const browserOsAssistantModes: Array<{
-  id: AgenticModeId;
-  label: string;
-  icon: LucideIcon;
-}> = [
-  { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "agent", label: "Assistant", icon: Headphones }
-];
-
 const browserOsAssistantModeIcons: Record<AgenticModeId, LucideIcon> = {
   chat: MessageSquare,
-  agent: Headphones,
-  workflow: Users,
-  schedule: ClipboardList,
-  memory: Database,
-  mcp: DatabaseZap
+  captures: Save
 };
 
 export function AppShell(): ReactElement {
@@ -300,58 +119,24 @@ export function AppShell(): ReactElement {
     currentTitle,
     currentUrl,
     selectedWorkspaceId,
-    selectedPlaybookId,
     captures,
-    knowledgeCaptureIds,
-    summary,
-    checklist,
-    selectionExplanation,
-    askPageAnswer,
-    askPageSources,
-    assistantMode,
     setUrl,
     setPageMetadata,
-    setWorkspace,
-    setPlaybook,
-    summarizePage,
-    extractChecklist,
-    explainSelection,
-    setAskPageAnswer,
     hydrateCaptures,
     addCapture,
-    clearCaptures,
-    addCaptureToKnowledge,
-    addAllCapturesToKnowledge,
-    removeCaptureFromKnowledge,
-    knowledgeDocumentChunks,
-    addKnowledgeDocumentChunks,
-    removeKnowledgeDocument,
-    oracleVectorSearchConfig,
-    setOracleVectorSearchConfig,
-    resetOracleVectorSearchConfig,
-    clearKnowledge
+    clearCaptures
   } = useLaunchpadStore();
   const browserSurfaceRef = useRef<BrowserSurfaceHandle>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
   const browserOsTopMenuRef = useRef<HTMLDivElement>(null);
   const [draftUrl, setDraftUrl] = useState(currentUrl);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [screenshotState, setScreenshotState] = useState<"idle" | "saving" | "saved">("idle");
   const [selectedCaptureId, setSelectedCaptureId] = useState<string>("");
   const [clipboardStatus, setClipboardStatus] = useState<string>("");
-  const [knowledgeQuestion, setKnowledgeQuestion] = useState("");
-  const [knowledgeAnswer, setKnowledgeAnswer] = useState("");
-  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSearchResult[]>([]);
-  const [knowledgeAdapterStatus, setKnowledgeAdapterStatus] = useState("");
-  const [knowledgeAskState, setKnowledgeAskState] = useState<"idle" | "asking">("idle");
-  const [ragAdapterId, setRagAdapterId] = useState<RagAdapterId>("local-keyword");
-  const [documentImportStatus, setDocumentImportStatus] = useState("");
-  const [connectorCheckState, setConnectorCheckState] = useState<"idle" | "checking">("idle");
-  const [connectorDiagnostic, setConnectorDiagnostic] = useState<LocalConnectorDiagnostic | null>(null);
-  const [oracleVectorExecution, setOracleVectorExecution] = useState<OracleVectorSearchExecutionResult | null>(null);
-  const [pocAssetState, setPocAssetState] = useState<"idle" | "generating">("idle");
-  const [pocAssetResult, setPocAssetResult] = useState<GeneratePocAssetsResult | null>(null);
-  const [selectedPocAssetKind, setSelectedPocAssetKind] = useState<GeneratedPocAsset["kind"]>("readme");
+  const [chatQuestion, setChatQuestion] = useState("保存済み captures から、OCI GenAI Enterprise AI の検討ポイントを整理してください。");
+  const [chatAnswer, setChatAnswer] = useState<GroundedKnowledgeAnswer | null>(null);
+  const [chatAskState, setChatAskState] = useState<"idle" | "asking">("idle");
+  const [chatStatus, setChatStatus] = useState("");
   const [browserState, setBrowserState] = useState<BrowserSurfaceState>({
     canGoBack: false,
     canGoForward: false,
@@ -359,7 +144,7 @@ export function AppShell(): ReactElement {
   });
   const [browserOsRoute, setBrowserOsRoute] = useState<BrowserOsRoute>("onboarding");
   const [browserOsGlobalZoomFactor, setBrowserOsGlobalZoomFactor] = useState(defaultBrowserViewZoomFactor);
-  const [agenticModeId, setAgenticModeId] = useState<AgenticModeId>("agent");
+  const [agenticModeId, setAgenticModeId] = useState<AgenticModeId>("captures");
   const [browserOsRailCollapsed, setBrowserOsRailCollapsed] = useState(false);
   const [browserOsTabSearchOpen, setBrowserOsTabSearchOpen] = useState(false);
   const [browserOsTabSearchQuery, setBrowserOsTabSearchQuery] = useState("");
@@ -368,37 +153,28 @@ export function AppShell(): ReactElement {
   const [browserOsLocalTabs, setBrowserOsLocalTabs] = useState<BrowserOsSideTab[]>([]);
   const [browserOsNextTabIndex, setBrowserOsNextTabIndex] = useState(1);
   const [browserOsAssistantPanel, setBrowserOsAssistantPanel] = useState(() =>
-    createBrowserAssistantPanelState<AgenticModeId>("agent")
+    createBrowserAssistantPanelState<AgenticModeId>("captures")
   );
-  const [browserOsAssistantContext, setBrowserOsAssistantContext] = useState(() => createBrowserAssistantContextState());
   const [browserOsRailStatus, setBrowserOsRailStatus] = useState("");
-  const [browserOsAssistantPrompt, setBrowserOsAssistantPrompt] = useState(
-    "このページを観測して、次に取るべき action と保存すべき evidence を整理してください。"
-  );
 
   const selectedWorkspace = mockWorkspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? mockWorkspaces[0];
-  const selectedPlaybook = mockPlaybooks.find((playbook) => playbook.id === selectedPlaybookId) ?? mockPlaybooks[0];
   const selectedCapture = captures.find((capture) => capture.id === selectedCaptureId) ?? captures[0];
-  const captureKnowledgeChunks = useMemo(
-    () => createKnowledgeChunks(captures, knowledgeCaptureIds),
-    [captures, knowledgeCaptureIds]
-  );
-  const knowledgeChunks = useMemo(
-    () => [...knowledgeDocumentChunks, ...captureKnowledgeChunks],
-    [captureKnowledgeChunks, knowledgeDocumentChunks]
+  const captureContextChunks = useMemo(
+    () => createKnowledgeChunks(captures, captures.map((capture) => capture.id)),
+    [captures]
   );
   const sourceType = detectSourceType(currentUrl);
   const activeAgenticMode = useMemo(
     () => agenticModes.find((mode) => mode.id === agenticModeId) ?? agenticModes[0],
     [agenticModeId]
   );
-  const activeProviderLabel = "OCI Generative AI";
+  const activeProviderLabel = activeAgenticMode.id === "chat" ? "OCI GenAI Enterprise AI" : "Electron local store";
   const browserOsAssistantPanelVisible = shouldRenderBrowserAssistantPanel(browserOsAssistantPanel, browserOsRoute);
-  const browserOsAssistantContextSummary = summarizeBrowserAssistantContext(browserOsAssistantContext.activeItem);
   const ActiveAgenticIcon = browserOsAssistantModeIcons[activeAgenticMode.id];
   const isBrowserOsOnboarding = browserOsRoute === "onboarding";
-  const isBrowserOsInternalPage = isBrowserOsOnboarding;
-  const displayedChromeUrl = isBrowserOsOnboarding ? "chrome://ai-launchpad/onboarding" : draftUrl;
+  const isBrowserOsSettings = browserOsRoute === "settings";
+  const isBrowserOsInternalPage = isBrowserOsOnboarding || isBrowserOsSettings;
+  const displayedChromeUrl = isBrowserOsOnboarding ? "chrome://ai-launchpad/onboarding" : isBrowserOsSettings ? "chrome://ai-launchpad/settings" : draftUrl;
 
   useEffect(() => {
     let canceled = false;
@@ -409,10 +185,7 @@ export function AppShell(): ReactElement {
       }
 
       try {
-        const [storedCaptures, storedDocuments] = await Promise.all([
-          window.aiLaunchpad.browserApi.listCaptures(),
-          window.aiLaunchpad.documentIngestion.listTextDocuments()
-        ]);
+        const storedCaptures = await window.aiLaunchpad.browserApi.listCaptures();
 
         if (canceled) {
           return;
@@ -423,13 +196,9 @@ export function AppShell(): ReactElement {
           setSelectedCaptureId((current) => current || storedCaptures.captures[0].id);
         }
 
-        const documentChunks = storedDocuments.documents.flatMap((entry) => entry.chunks);
-        if (documentChunks.length > 0) {
-          addKnowledgeDocumentChunks(documentChunks);
-        }
       } catch {
         if (!canceled) {
-          setDocumentImportStatus("ローカル保存データを読み込めませんでした。");
+          setClipboardStatus("ローカル保存データを読み込めませんでした。");
         }
       }
     }
@@ -438,15 +207,14 @@ export function AppShell(): ReactElement {
     return () => {
       canceled = true;
     };
-  }, [addKnowledgeDocumentChunks, hydrateCaptures]);
+  }, [hydrateCaptures]);
 
   const currentContext = useMemo(
     () => ({
       workspace: selectedWorkspace.name,
-      playbook: selectedPlaybook.title,
       source: sourceLabels[sourceType]
     }),
-    [selectedPlaybook.title, selectedWorkspace.name, sourceType]
+    [selectedWorkspace.name, sourceType]
   );
 
   const handlePageMetadataChange = useCallback(
@@ -525,11 +293,6 @@ export function AppShell(): ReactElement {
     [browserOsSideSections, handleSelectBrowserOsTab]
   );
 
-  const handleClearBrowserOsAssistantContext = useCallback(() => {
-    setBrowserOsAssistantContext((current) => clearBrowserAssistantContext(current));
-    setBrowserOsRailStatus("Assistant context を解除しました。");
-  }, []);
-
   const handleApplyBrowserViewCommand = useCallback(
     (command: BrowserViewCommand) => {
       if (isBrowserViewZoomCommand(command)) {
@@ -570,16 +333,9 @@ export function AppShell(): ReactElement {
     };
   }, [handleApplyBrowserViewCommand]);
 
-
-  const handleSelectBrowserOsAssistantMode = useCallback((modeId: AgenticModeId) => {
-    setAgenticModeId(modeId);
-    setBrowserOsAssistantPanel((current) => openBrowserAssistantPanel(current, modeId, "toolbar"));
-    setBrowserOsRailStatus(`${modeId} assistant panel を開きました。`);
-  }, []);
-
   const handleCloseBrowserOsAssistantPanel = useCallback(() => {
     setBrowserOsAssistantPanel((current) => closeBrowserAssistantPanel(current));
-    setBrowserOsRailStatus("Assistant side panel を閉じました。Toolbar の Chat / Council / Assistant から再表示できます。");
+    setBrowserOsRailStatus("Workspace panel を閉じました。Toolbar の Chat / Captures から再表示できます。");
   }, []);
 
   const handleCreateBrowserOsTab = useCallback(() => {
@@ -656,17 +412,17 @@ export function AppShell(): ReactElement {
     const pageTitle = metadata?.title || currentTitle;
     const pageSourceType = detectSourceType(pageUrl);
     const payload = {
-      workspaceId: selectedWorkspaceId,
+      workspaceId: selectedWorkspace.id,
       url: pageUrl,
       title: pageTitle,
       sourceType: pageSourceType,
-      summary: summary || undefined
+      summary: undefined
     };
 
     const result = window.aiLaunchpad
       ? await window.aiLaunchpad.browserApi.savePage(payload)
       : createPreviewCaptureResult({
-          workspaceId: selectedWorkspaceId,
+          workspaceId: selectedWorkspace.id,
           kind: "page",
           title: pageTitle,
           url: pageUrl,
@@ -692,14 +448,14 @@ export function AppShell(): ReactElement {
     const screenshotDataUrl = await browserSurfaceRef.current?.captureScreenshot();
     const result = window.aiLaunchpad
       ? await window.aiLaunchpad.browserApi.saveScreenshot({
-          workspaceId: selectedWorkspaceId,
+          workspaceId: selectedWorkspace.id,
           url: pageUrl,
           title: pageTitle,
           sourceType: pageSourceType,
           screenshotDataUrl
         })
       : createPreviewCaptureResult({
-          workspaceId: selectedWorkspaceId,
+          workspaceId: selectedWorkspace.id,
           kind: "screenshot",
           title: `スクリーンショット: ${pageTitle}`,
           url: pageUrl,
@@ -717,16 +473,11 @@ export function AppShell(): ReactElement {
     window.setTimeout(() => setScreenshotState("idle"), 1200);
   }
 
-  async function handleExplainSelection(): Promise<void> {
-    const selectedText = await browserSurfaceRef.current?.getSelectedText();
-    explainSelection(selectedText);
-  }
-
   async function handleSaveSelection(): Promise<void> {
     const selectedText = await browserSurfaceRef.current?.getSelectedText();
     const trimmedText = selectedText?.trim();
     if (!trimmedText) {
-      explainSelection("");
+      setBrowserOsRailStatus("選択テキストがありません。ページ内でテキストを選択してから保存してください。");
       return;
     }
 
@@ -736,14 +487,14 @@ export function AppShell(): ReactElement {
     const pageSourceType = detectSourceType(pageUrl);
     const result = window.aiLaunchpad
       ? await window.aiLaunchpad.browserApi.saveSelection({
-          workspaceId: selectedWorkspaceId,
+          workspaceId: selectedWorkspace.id,
           url: pageUrl,
           title: pageTitle,
           sourceType: pageSourceType,
           selectedText: trimmedText
         })
       : createPreviewCaptureResult({
-          workspaceId: selectedWorkspaceId,
+          workspaceId: selectedWorkspace.id,
           kind: "selection",
           title: `選択: ${pageTitle}`,
           url: pageUrl,
@@ -756,35 +507,7 @@ export function AppShell(): ReactElement {
       sourceType: detectSourceType(result.capture.url)
     });
     setSelectedCaptureId(result.id);
-    explainSelection(trimmedText);
-  }
-
-  async function handleAskPage(promptOverride?: string): Promise<void> {
-    const metadata = await browserSurfaceRef.current?.getPageMetadata();
-    const pageUrl = metadata?.url || currentUrl;
-    const pageTitle = metadata?.title || currentTitle;
-    const prompt =
-      promptOverride?.trim() ||
-      `${selectedPlaybook.title} の観点で、このページから PoC に使う前提条件、手順、注意点を整理してください。`;
-    const result = window.aiLaunchpad
-      ? await window.aiLaunchpad.browserApi.askPage({
-          workspaceId: selectedWorkspaceId,
-          url: pageUrl,
-          title: pageTitle,
-          prompt
-        })
-      : {
-          answer: `${pageTitle} を ${selectedPlaybook.title} の観点で整理しました。現時点では renderer preview の mock 応答です。`,
-          sources: [{ title: pageTitle, url: pageUrl }]
-        };
-
-    setAskPageAnswer(result.answer, result.sources);
-  }
-
-  function handleSubmitBrowserOsAssistantPrompt(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    setAgenticModeId("chat");
-    void handleAskPage(formatBrowserAssistantContextPrompt(browserOsAssistantPrompt, browserOsAssistantContext.activeItem));
+    setBrowserOsRailStatus("選択テキストを local capture に保存しました。");
   }
 
   async function copyToClipboard(text: string, successLabel: string): Promise<void> {
@@ -823,70 +546,50 @@ export function AppShell(): ReactElement {
     void copyToClipboard(formatCapturesMarkdown(captures, mockWorkspaces), "全件 Markdown をコピーしました");
   }
 
-  async function handleAskKnowledge(): Promise<void> {
-    setKnowledgeAskState("asking");
-    try {
-      const groundedAnswer = window.aiLaunchpad
-        ? await window.aiLaunchpad.ragAdapter.askKnowledge({
-            question: knowledgeQuestion,
-            chunks: knowledgeChunks,
-            maxResults: 3,
-            adapter: ragAdapterId,
-            oracleVectorSearch: oracleVectorSearchConfig
-          })
-        : answerKnowledgeQuestion(knowledgeQuestion, knowledgeChunks, 3, ragAdapterId, oracleVectorSearchConfig);
+  function handleUseChatPrompt(prompt: string): void {
+    setChatQuestion(prompt);
+    setChatStatus("");
+  }
 
-      setKnowledgeAnswer(groundedAnswer.answer);
-      setKnowledgeSources(groundedAnswer.results);
-      setOracleVectorExecution(groundedAnswer.oracleVectorSearch ?? null);
-      const answerProviderLabel = groundedAnswer.answerProvider === "oci-genai" ? " / answer: OCI GenAI" : "";
-      setKnowledgeAdapterStatus(
-        groundedAnswer.latencyMs === undefined
-          ? `Adapter: ${groundedAnswer.adapter} / ${groundedAnswer.adapterStatus ?? "ready"}${answerProviderLabel}`
-          : `Adapter: ${groundedAnswer.adapter} / ${groundedAnswer.adapterStatus ?? "ready"} / ${groundedAnswer.latencyMs}ms${answerProviderLabel}`
+  async function handleAskCaptureChat(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    const question = chatQuestion.trim();
+    if (!question) {
+      setChatStatus("質問を入力してください。");
+      return;
+    }
+
+    if (captureContextChunks.length === 0) {
+      setChatAnswer(answerKnowledgeQuestion(question, [], 4));
+      setChatStatus("先にページ、選択テキスト、またはスクリーンショットを Captures に保存してください。");
+      return;
+    }
+
+    setChatAskState("asking");
+    setChatStatus("");
+
+    try {
+      const result = window.aiLaunchpad
+        ? await window.aiLaunchpad.ragAdapter.askKnowledge({
+            question,
+            chunks: captureContextChunks,
+            maxResults: 4
+          })
+        : answerKnowledgeQuestion(question, captureContextChunks, 4);
+
+      setChatAnswer(result);
+      setChatStatus(
+        result.answerProvider === "oci-genai"
+          ? "OCI GenAI Enterprise AI で回答しました。"
+          : "保存済み captures をローカルで検索して回答候補を作成しました。"
       );
     } catch {
-      setKnowledgeAnswer("RAG adapter の呼び出しに失敗しました。local adapter または IPC 設定を確認してください。");
-      setKnowledgeSources([]);
-      setOracleVectorExecution(null);
-      setKnowledgeAdapterStatus("Adapter: unavailable");
+      setChatAnswer(answerKnowledgeQuestion(question, captureContextChunks, 4));
+      setChatStatus("OCI GenAI に接続できなかったため、保存済み captures のローカル検索結果を表示しています。");
     } finally {
-      setKnowledgeAskState("idle");
+      setChatAskState("idle");
     }
-  }
-
-  function createKnowledgeAnswerMarkdown(): string {
-    return formatKnowledgeAnswerMarkdown({
-      workspaceName: selectedWorkspace.name,
-      playbookTitle: selectedPlaybook.title,
-      question: knowledgeQuestion,
-      answer: knowledgeAnswer,
-      adapterStatus: knowledgeAdapterStatus,
-      sources: knowledgeSources,
-      oracleVectorExecution
-    });
-  }
-
-  function handleCopyKnowledgeAnswer(): void {
-    void copyToClipboard(createKnowledgeAnswerMarkdown(), "Grounded answer をコピーしました");
-  }
-
-  function handleDownloadKnowledgeAnswer(): void {
-    const fileName = createKnowledgeAnswerFileName(selectedWorkspace.name, new Date().toISOString());
-
-    downloadTextFile(fileName, createKnowledgeAnswerMarkdown());
-    setClipboardStatus(`${fileName} を保存しました`);
-  }
-
-  function handleCopyOracleVectorSql(sqlPreview: string): void {
-    void copyToClipboard(sqlPreview, "Oracle Vector SQL をコピーしました");
-  }
-
-  function handleDownloadOracleVectorSql(sqlPreview: string): void {
-    const fileName = createOracleVectorSqlFileName(selectedWorkspace.name, new Date().toISOString());
-
-    downloadTextFile(fileName, `${sqlPreview}\n`);
-    setClipboardStatus(`${fileName} を保存しました`);
   }
 
   async function handleClearCaptures(): Promise<void> {
@@ -898,228 +601,8 @@ export function AppShell(): ReactElement {
     setSelectedCaptureId("");
   }
 
-  async function handleClearKnowledge(): Promise<void> {
-    if (window.aiLaunchpad) {
-      await window.aiLaunchpad.documentIngestion.clearTextDocuments();
-    }
-
-    clearKnowledge();
-    setKnowledgeAnswer("");
-    setKnowledgeSources([]);
-    setOracleVectorExecution(null);
-    setKnowledgeAdapterStatus("");
-    setDocumentImportStatus("");
-  }
-
-  function handleRagAdapterChange(adapter: RagAdapterId): void {
-    setRagAdapterId(adapter);
-    setKnowledgeAnswer("");
-    setKnowledgeSources([]);
-    setOracleVectorExecution(null);
-    setKnowledgeAdapterStatus("");
-  }
-
-  function handleOracleVectorConfigChange(patch: Partial<OracleVectorSearchConfig>): void {
-    setOracleVectorSearchConfig(patch);
-    setKnowledgeAnswer("");
-    setKnowledgeSources([]);
-    setOracleVectorExecution(null);
-    setKnowledgeAdapterStatus("");
-  }
-
-  function handleResetOracleVectorConfig(): void {
-    resetOracleVectorSearchConfig();
-    setKnowledgeAnswer("");
-    setKnowledgeSources([]);
-    setOracleVectorExecution(null);
-    setKnowledgeAdapterStatus("");
-  }
-
-  async function handleCheckLocalConnector(): Promise<void> {
-    setConnectorCheckState("checking");
-    try {
-      const [health, ociConfig, sqlcl, adbWallet, objectStorage] = window.aiLaunchpad
-        ? await Promise.all([
-            window.aiLaunchpad.localConnector.health(),
-            window.aiLaunchpad.localConnector.ociCheckConfig(),
-            window.aiLaunchpad.localConnector.sqlclCheck(),
-            window.aiLaunchpad.localConnector.adbWalletCheck(),
-            window.aiLaunchpad.localConnector.objectStorageCheck()
-          ])
-        : await Promise.resolve([
-            {
-              status: "mock-ready",
-              connector: "local-connector",
-              mode: "not-connected",
-              message: "renderer preview の mock connector です。"
-            } satisfies LocalConnectorHealth,
-            {
-              status: "not-configured",
-              message: "renderer preview では OCI config を読み取りません。"
-            } satisfies OciCheckConfigResult,
-            {
-              status: "not-configured",
-              message: "renderer preview では SQLcl を確認しません。"
-            } satisfies SqlclCheckResult,
-            {
-              status: "not-configured",
-              message: "renderer preview では ADB wallet を確認しません。"
-            } satisfies AdbWalletCheckResult,
-            {
-              status: "not-configured",
-              message: "renderer preview では Object Storage を確認しません。"
-            } satisfies ObjectStorageCheckResult
-          ] as const);
-
-      setConnectorDiagnostic({
-        health,
-        ociConfig,
-        sqlcl,
-        adbWallet,
-        objectStorage,
-        checkedAt: new Date().toISOString()
-      });
-    } catch {
-      setConnectorDiagnostic({
-        health: {
-          status: "unavailable",
-          connector: "local-connector",
-          mode: "error",
-          message: "Local Connector health check に失敗しました。"
-        },
-        ociConfig: {
-          status: "unavailable",
-          message: "OCI config check に失敗しました。IPC または connector process を確認してください。"
-        },
-        sqlcl: {
-          status: "unavailable",
-          message: "SQLcl check に失敗しました。IPC または connector process を確認してください。"
-        },
-        adbWallet: {
-          status: "unavailable",
-          message: "ADB wallet check に失敗しました。IPC または connector process を確認してください。"
-        },
-        objectStorage: {
-          status: "unavailable",
-          message: "Object Storage check に失敗しました。IPC または connector process を確認してください。"
-        },
-        checkedAt: new Date().toISOString()
-      });
-    } finally {
-      setConnectorCheckState("idle");
-    }
-  }
-
-  async function handleGeneratePocAssets(): Promise<void> {
-    setPocAssetState("generating");
-    try {
-      const result = window.aiLaunchpad
-        ? await window.aiLaunchpad.localConnector.generatePocAssets({
-            workspaceName: selectedWorkspace.name,
-            playbookTitle: selectedPlaybook.title,
-            useCase: selectedPlaybook.category,
-            vectorTable: oracleVectorSearchConfig.tableName || undefined,
-            objectStorageNamespace: connectorDiagnostic?.objectStorage.namespace,
-            objectStorageBucket: connectorDiagnostic?.objectStorage.bucketName,
-            ociRegion: connectorDiagnostic?.objectStorage.region,
-            embeddingModel: oracleVectorSearchConfig.embeddingModel || undefined
-          })
-        : createPreviewPocAssetsResult(selectedWorkspace.name, selectedPlaybook.title);
-
-      setPocAssetResult(result);
-      setSelectedPocAssetKind(result.assets[0]?.kind ?? "readme");
-    } finally {
-      setPocAssetState("idle");
-    }
-  }
-
-  function handleCopyPocAsset(asset: GeneratedPocAsset): void {
-    void copyToClipboard(asset.content, `${asset.fileName} をコピーしました`);
-  }
-
-  function handleCopyPocPackage(result: GeneratePocAssetsResult): void {
-    void copyToClipboard(formatPocAssetPackage(result), "PoC package をコピーしました");
-  }
-
-  function handleDownloadPocPackage(result: GeneratePocAssetsResult): void {
-    const fileName = createPocPackageFileName(selectedWorkspace.name, result.generatedAt);
-
-    downloadTextFile(fileName, formatPocAssetPackage(result));
-    setClipboardStatus(`${fileName} を保存しました`);
-  }
-
-  function handleRemoveKnowledgeChunk(chunk: KnowledgeChunk): void {
-    if (chunk.sourceKind === "document") {
-      removeKnowledgeDocument(chunk.captureId);
-    } else {
-      removeCaptureFromKnowledge(chunk.captureId);
-    }
-    setKnowledgeAnswer("");
-    setKnowledgeSources([]);
-    setOracleVectorExecution(null);
-    setKnowledgeAdapterStatus("");
-  }
-
-  function handleImportedDocumentResult(result: IngestTextDocumentResult | null): void {
-    if (!result) {
-      return;
-    }
-
-    if (!result.ok) {
-      setDocumentImportStatus(result.message);
-      return;
-    }
-
-    addKnowledgeDocumentChunks(result.chunks);
-    setKnowledgeAnswer("");
-    setKnowledgeSources([]);
-    setOracleVectorExecution(null);
-    setKnowledgeAdapterStatus("");
-    setDocumentImportStatus(`${result.document.fileName} を Knowledge に追加しました。${result.chunks.length} chunks`);
-  }
-
-  async function handleImportDocument(): Promise<void> {
-    if (window.aiLaunchpad) {
-      handleImportedDocumentResult(await window.aiLaunchpad.documentIngestion.importTextDocument());
-      return;
-    }
-
-    documentInputRef.current?.click();
-  }
-
-  async function handlePreviewDocumentSelected(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    if (file.size > MAX_TEXT_DOCUMENT_BYTES) {
-      setDocumentImportStatus(`文書サイズが上限 ${Math.round(MAX_TEXT_DOCUMENT_BYTES / 1024)} KB を超えています。`);
-      return;
-    }
-
-    const text = await file.text();
-    handleImportedDocumentResult(
-      ingestTextDocument({
-        fileName: file.name,
-        text,
-        documentId: `document-${crypto.randomUUID()}`,
-        importedAt: new Date().toISOString()
-      })
-    );
-  }
-
   return (
     <div className="flex h-screen min-h-[720px] bg-white text-foreground">
-      <input
-        ref={documentInputRef}
-        type="file"
-        accept=".md,.txt,text/markdown,text/plain"
-        className="hidden"
-        onChange={handlePreviewDocumentSelected}
-      />
       <BrowserOsSideRail
         activeRoute={browserOsRoute}
         activeAgenticMode={agenticModeId}
@@ -1228,27 +711,6 @@ export function AppShell(): ReactElement {
             </div>
           </form>
 
-          {!isBrowserOsInternalPage ? (
-            <div className="relative hidden shrink-0 xl:block">
-              <label className="sr-only" htmlFor="workspace-selector">
-                Workspace selector
-              </label>
-              <select
-                id="workspace-selector"
-                value={selectedWorkspaceId}
-                onChange={(event) => setWorkspace(event.target.value)}
-                className="h-7 w-[190px] cursor-pointer appearance-none rounded-full border border-[#e2e2e2] bg-white py-0 pl-3 pr-8 text-xs text-[#3f3f46] shadow-sm outline-none transition-colors duration-200 focus:border-[#f26a2e] focus:ring-2 focus:ring-orange-100"
-              >
-                {mockWorkspaces.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspace.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#71717a]" />
-            </div>
-          ) : null}
-
           <div ref={browserOsTopMenuRef} className="relative ml-1 flex shrink-0 items-center gap-1 text-xs font-medium text-[#5f6368]">
             <BrowserOsToolbarAction
               label="Chat"
@@ -1257,10 +719,20 @@ export function AppShell(): ReactElement {
               onClick={() => handleSelectTopAgenticMode("chat")}
             />
             <BrowserOsToolbarAction
-              label="Assistant"
-              icon={Headphones}
-              active={browserOsAssistantPanelVisible && agenticModeId === "agent"}
-              onClick={() => handleSelectTopAgenticMode("agent")}
+              label="Captures"
+              icon={Save}
+              active={browserOsAssistantPanelVisible && agenticModeId === "captures"}
+              onClick={() => handleSelectTopAgenticMode("captures")}
+            />
+            <BrowserOsToolbarAction
+              label="Settings"
+              icon={SettingsIcon}
+              active={browserOsRoute === "settings"}
+              onClick={() => {
+                setBrowserOsRoute("settings");
+                setBrowserOsActiveTabId("settings");
+                setBrowserOsRailStatus("Settings を開きました。");
+              }}
             />
           </div>
         </header>
@@ -1277,6 +749,8 @@ export function AppShell(): ReactElement {
               }
             }}
           />
+        ) : isBrowserOsSettings ? (
+          <OciGenAiSettingsPage onStatusChange={setBrowserOsRailStatus} />
         ) : (
         <div
           className={cn(
@@ -1299,7 +773,7 @@ export function AppShell(): ReactElement {
           </section>
 
           {browserOsAssistantPanelVisible ? (
-          <aside className="flex min-h-0 flex-col border-l border-[#d7d7d7] bg-[#fbfbfa]" aria-label="Assistant side panel">
+          <aside className="flex min-h-0 flex-col border-l border-[#d7d7d7] bg-[#fbfbfa]" aria-label="Workspace side panel">
             <div className="border-b border-[#e5e5e5] bg-[#f7f7f6] px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -1307,7 +781,7 @@ export function AppShell(): ReactElement {
                     <ActiveAgenticIcon aria-hidden="true" className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[#171717]">Assistant</p>
+                    <p className="truncate text-sm font-semibold text-[#171717]">Workspace Panel</p>
                     <p className="truncate text-[11px] text-[#71717a]">{activeAgenticMode.label} / {currentContext.workspace}</p>
                   </div>
                 </div>
@@ -1317,8 +791,8 @@ export function AppShell(): ReactElement {
                   </span>
                   <button
                     type="button"
-                    aria-label="Assistant side panel を閉じる"
-                    title="Assistant side panel を閉じる"
+                    aria-label="Workspace side panel を閉じる"
+                    title="Workspace side panel を閉じる"
                     onClick={handleCloseBrowserOsAssistantPanel}
                     className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#5f6368] transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
                   >
@@ -1327,32 +801,6 @@ export function AppShell(): ReactElement {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-1" role="tablist" aria-label="Assistant modes">
-                {browserOsAssistantModes.map((mode) => {
-                  const ModeIcon = mode.icon;
-                  const active = agenticModeId === mode.id;
-
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      aria-pressed={active}
-                      onClick={() => handleSelectBrowserOsAssistantMode(mode.id)}
-                      className={cn(
-                        "inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full border text-[11px] font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500",
-                        active
-                          ? "border-[#ffd8c7] bg-white text-[#f05a24] shadow-sm"
-                          : "border-transparent text-[#5f6368] hover:bg-white/75"
-                      )}
-                    >
-                      <ModeIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                      {mode.label}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
@@ -1371,84 +819,18 @@ export function AppShell(): ReactElement {
                 </div>
               </section>
 
-              <form onSubmit={handleSubmitBrowserOsAssistantPrompt} className="mt-3 rounded-md border border-[#e5e5e5] bg-white p-3 shadow-sm">
-                <label htmlFor="browseros-assistant-prompt" className="text-xs font-semibold text-[#52525b]">
-                  Ask this page
-                </label>
-                <textarea
-                  id="browseros-assistant-prompt"
-                  value={browserOsAssistantPrompt}
-                  onChange={(event) => setBrowserOsAssistantPrompt(event.target.value)}
-                  rows={4}
-                  className="mt-2 w-full resize-none rounded-md border border-[#e2e2e2] bg-[#fcfcfc] px-3 py-2 text-sm leading-6 text-[#171717] outline-none transition-colors duration-200 focus:border-[#f26a2e] focus:ring-2 focus:ring-orange-100"
-                />
-                <div className="mt-2 grid grid-cols-3 gap-1.5 text-[10px] text-[#71717a]">
-                  <span className="truncate rounded-md bg-[#f4f4f5] px-2 py-1">{currentContext.source}</span>
-                  <span className="truncate rounded-md bg-[#f4f4f5] px-2 py-1">{captures.length} captures</span>
-                  <span className="truncate rounded-md bg-[#f4f4f5] px-2 py-1">{knowledgeChunks.length} chunks</span>
-                </div>
-                <div className="mt-1.5 truncate rounded-md bg-[#fff7f2] px-2 py-1 text-[10px] font-semibold text-[#c2410c]">
-                  Context: {browserOsAssistantContextSummary}
-                </div>
-                {browserOsAssistantContext.activeItem ? (
-                  <BrowserOsAssistantContextCard
-                    item={browserOsAssistantContext.activeItem}
-                    onClear={handleClearBrowserOsAssistantContext}
-                  />
-                ) : null}
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <p className="text-[11px] leading-4 text-[#71717a]">ページ URL、title、workspace context、添付 context を preview に渡します。</p>
-                  <Button type="submit" size="sm" className="shrink-0">
-                    <MessageSquare aria-hidden="true" className="h-4 w-4" />
-                    Run preview
-                  </Button>
-                </div>
-              </form>
-
               <section className="mt-3 rounded-md border border-[#e5e5e5] bg-white p-3 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-normal text-[#71717a]">Current page</p>
                 <dl className="mt-3 space-y-2 text-sm">
-                  <ContextRow label="Playbook" value={currentContext.playbook} />
                   <ContextRow label="Source" value={currentContext.source} />
                   <ContextRow label="Page" value={currentTitle} />
                 </dl>
-              </section>
-
-              <section className="mt-4">
-                <label htmlFor="playbook-selector" className="text-xs font-semibold uppercase tracking-normal text-[#71717a]">
-                  Playbook
-                </label>
-                <select
-                  id="playbook-selector"
-                  value={selectedPlaybookId}
-                  onChange={(event) => setPlaybook(event.target.value)}
-                  className="mt-2 h-10 w-full cursor-pointer rounded-md border border-[#e2e2e2] bg-white px-3 text-sm text-[#171717] outline-none transition-colors duration-200 focus:border-[#f26a2e] focus:ring-2 focus:ring-orange-100"
-                >
-                  {mockPlaybooks.map((playbook) => (
-                    <option key={playbook.id} value={playbook.id}>
-                      {playbook.title}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-3 text-[10px] text-[#71717a]">
+                  <span className="truncate rounded-md bg-[#f4f4f5] px-2 py-1">{captures.length} captures</span>
+                </div>
               </section>
 
               <section className="mt-4 grid grid-cols-2 gap-2">
-                <Button variant="outline" onClick={() => void handleAskPage()}>
-                  <Bot aria-hidden="true" className="h-4 w-4" />
-                  質問
-                </Button>
-                <Button variant="outline" onClick={summarizePage}>
-                  <FileText aria-hidden="true" className="h-4 w-4" />
-                  要約
-                </Button>
-                <Button variant="outline" onClick={extractChecklist}>
-                  <CheckSquare aria-hidden="true" className="h-4 w-4" />
-                  手順化
-                </Button>
-                <Button variant="outline" onClick={handleExplainSelection}>
-                  <Sparkles aria-hidden="true" className="h-4 w-4" />
-                  説明
-                </Button>
                 <Button variant="outline" onClick={handleSaveSelection}>
                   <TextSelect aria-hidden="true" className="h-4 w-4" />
                   選択保存
@@ -1463,144 +845,90 @@ export function AppShell(): ReactElement {
                 </Button>
               </section>
 
-              <AssistantOutput
-                mode={assistantMode}
-                summary={summary}
-                checklist={checklist}
-                explanation={selectionExplanation}
-                askPageAnswer={askPageAnswer}
-                askPageSources={askPageSources}
-              />
-
-              <section className="mt-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Demo Cockpit</h2>
-                  <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">{selectedPlaybook.category}</span>
-                </div>
-                <ol className="space-y-2">
-                  {selectedPlaybook.demoSteps.map((step, index) => (
-                    <li key={step} className="flex gap-3 rounded-md border border-border bg-white p-3 text-sm text-slate-700">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-700">
-                        {index + 1}
-                      </span>
-                      <span className="leading-5">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </section>
-
-              <section className="mt-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-sm font-semibold">Captures</h2>
-                    <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                      <DatabaseZap aria-hidden="true" className="h-3.5 w-3.5 text-sky-700" />
-                      Electron local store に保存
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={handleClearCaptures} disabled={captures.length === 0}>
-                    クリア
-                  </Button>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {captures.length === 0 ? (
-                    <p className="rounded-md border border-dashed border-border p-4 text-sm leading-6 text-slate-500">
-                      保存したページはここに表示されます。
-                    </p>
-                  ) : (
-                    captures.map((capture) => (
-                      <button
-                        key={capture.id}
-                        type="button"
-                        onClick={() => setSelectedCaptureId(capture.id)}
-                        className={cn(
-                          "w-full cursor-pointer rounded-md border bg-white p-3 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700",
-                          selectedCapture?.id === capture.id ? "border-sky-700 bg-sky-50" : "border-border hover:bg-slate-50"
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="min-w-0 truncate text-sm font-medium text-slate-950">{capture.title}</p>
-                          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                            {formatCaptureKind(capture.kind)}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-xs text-slate-500">{capture.url}</p>
-                        {capture.screenshotDataUrl ? (
-                          <img
-                            src={capture.screenshotDataUrl}
-                            alt={`${capture.title} thumbnail`}
-                            className="mt-3 aspect-video w-full rounded-md border border-border bg-slate-50 object-cover"
-                          />
-                        ) : null}
-                        {capture.selectedText ? (
-                          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{capture.selectedText}</p>
-                        ) : null}
-                      </button>
-                    ))
-                  )}
-                </div>
-                {captures.length > 0 ? (
-                  <div className="mt-3">
-                    <Button variant="outline" size="sm" onClick={handleExportAllMarkdown} className="w-full">
-                      <FileDown aria-hidden="true" className="h-4 w-4" />
-                      全件 Markdown 出力
-                    </Button>
-                  </div>
-                ) : null}
-              </section>
-
-              {selectedCapture ? (
-                <CaptureDetail
-                  capture={selectedCapture}
-                  workspaceName={mockWorkspaces.find((workspace) => workspace.id === selectedCapture.workspaceId)?.name ?? "Unknown"}
-                  clipboardStatus={clipboardStatus}
-                  isInKnowledge={knowledgeCaptureIds.includes(selectedCapture.id)}
-                  onAddToKnowledge={() => addCaptureToKnowledge(selectedCapture.id)}
-                  onCopy={() => handleCopyCapture(selectedCapture)}
-                  onExportMarkdown={() => handleExportCaptureMarkdown(selectedCapture)}
+              {agenticModeId === "chat" ? (
+                <CaptureChatPanel
+                  answer={chatAnswer}
+                  askState={chatAskState}
+                  captureCount={captures.length}
+                  question={chatQuestion}
+                  status={chatStatus}
+                  onAsk={handleAskCaptureChat}
+                  onQuestionChange={setChatQuestion}
+                  onUsePrompt={handleUseChatPrompt}
                 />
-              ) : null}
+              ) : (
+                <>
+                  <section className="mt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm font-semibold">Captures</h2>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                          <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5 text-sky-700" />
+                          Electron local store に保存
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={handleClearCaptures} disabled={captures.length === 0}>
+                        クリア
+                      </Button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {captures.length === 0 ? (
+                        <p className="rounded-md border border-dashed border-border p-4 text-sm leading-6 text-slate-500">
+                          保存したページはここに表示されます。
+                        </p>
+                      ) : (
+                        captures.map((capture) => (
+                          <button
+                            key={capture.id}
+                            type="button"
+                            onClick={() => setSelectedCaptureId(capture.id)}
+                            className={cn(
+                              "w-full cursor-pointer rounded-md border bg-white p-3 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700",
+                              selectedCapture?.id === capture.id ? "border-sky-700 bg-sky-50" : "border-border hover:bg-slate-50"
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="min-w-0 truncate text-sm font-medium text-slate-950">{capture.title}</p>
+                              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                {formatCaptureKind(capture.kind)}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-xs text-slate-500">{capture.url}</p>
+                            {capture.screenshotDataUrl ? (
+                              <img
+                                src={capture.screenshotDataUrl}
+                                alt={`${capture.title} thumbnail`}
+                                className="mt-3 aspect-video w-full rounded-md border border-border bg-slate-50 object-cover"
+                              />
+                            ) : null}
+                            {capture.selectedText ? (
+                              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{capture.selectedText}</p>
+                            ) : null}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    {captures.length > 0 ? (
+                      <div className="mt-3">
+                        <Button variant="outline" size="sm" onClick={handleExportAllMarkdown} className="w-full">
+                          <FileDown aria-hidden="true" className="h-4 w-4" />
+                          全件 Markdown 出力
+                        </Button>
+                      </div>
+                    ) : null}
+                  </section>
 
-              <KnowledgePanel
-                captureCount={captures.length}
-                chunks={knowledgeChunks}
-                question={knowledgeQuestion}
-                answer={knowledgeAnswer}
-                sources={knowledgeSources}
-                oracleVectorExecution={oracleVectorExecution}
-                adapterStatus={knowledgeAdapterStatus}
-                isAnswering={knowledgeAskState === "asking"}
-                adapterId={ragAdapterId}
-                oracleVectorSearchConfig={oracleVectorSearchConfig}
-                connectorDiagnostic={connectorDiagnostic}
-                isCheckingConnector={connectorCheckState === "checking"}
-                documentImportStatus={documentImportStatus}
-                onAdapterChange={handleRagAdapterChange}
-                onOracleVectorConfigChange={handleOracleVectorConfigChange}
-                onResetOracleVectorConfig={handleResetOracleVectorConfig}
-                onCheckConnector={handleCheckLocalConnector}
-                onQuestionChange={setKnowledgeQuestion}
-                onAddAll={addAllCapturesToKnowledge}
-                onClear={handleClearKnowledge}
-                onRemove={handleRemoveKnowledgeChunk}
-                onImportDocument={handleImportDocument}
-                onAsk={handleAskKnowledge}
-                onCopyAnswer={handleCopyKnowledgeAnswer}
-                onDownloadAnswer={handleDownloadKnowledgeAnswer}
-                onCopyOracleVectorSql={handleCopyOracleVectorSql}
-                onDownloadOracleVectorSql={handleDownloadOracleVectorSql}
-              />
-
-              <PocAssetsPanel
-                result={pocAssetResult}
-                selectedKind={selectedPocAssetKind}
-                isGenerating={pocAssetState === "generating"}
-                onGenerate={handleGeneratePocAssets}
-                onSelectAsset={setSelectedPocAssetKind}
-                onCopyAsset={handleCopyPocAsset}
-                onCopyPackage={handleCopyPocPackage}
-                onDownloadPackage={handleDownloadPocPackage}
-              />
+                  {selectedCapture ? (
+                    <CaptureDetail
+                      capture={selectedCapture}
+                      workspaceName={mockWorkspaces.find((workspace) => workspace.id === selectedCapture.workspaceId)?.name ?? "Unknown"}
+                      clipboardStatus={clipboardStatus}
+                      onCopy={() => handleCopyCapture(selectedCapture)}
+                      onExportMarkdown={() => handleExportCaptureMarkdown(selectedCapture)}
+                    />
+                  ) : null}
+                </>
+              )}
             </div>
           </aside>
           ) : null}
@@ -1629,6 +957,7 @@ const browserOsBaseSideSections: BrowserRailSection<BrowserOsSideTab>[] = [
     tabs: [
       { id: "onboarding", label: "AI Launchpad", icon: Sparkles, route: "onboarding", closeable: true, accent: "orange" },
       { id: "workspace", label: "Oracle Workspace", icon: LayoutDashboard, route: "workspace", accent: "orange" },
+      { id: "settings", label: "Settings", icon: SettingsIcon, route: "settings", accent: "slate" },
       { id: "docs", label: "Oracle Docs", icon: BookOpen, pageTarget: { url: defaultUrl }, closeable: true, accent: "slate" },
       {
         id: "github",
@@ -1644,8 +973,7 @@ const browserOsBaseSideSections: BrowserRailSection<BrowserOsSideTab>[] = [
     id: "assistant",
     tabs: [
       { id: "chat", label: "Chat", icon: MessageSquare, agenticMode: "chat", accent: "orange" },
-      { id: "council", label: "Council", icon: BrainCircuit, agenticMode: "workflow", accent: "orange" },
-      { id: "assistant", label: "Assistant", icon: Headphones, route: "workspace", agenticMode: "agent", accent: "orange" }
+      { id: "captures", label: "Captures", icon: Save, route: "workspace", agenticMode: "captures", accent: "orange" }
     ]
   },
   {
@@ -1654,7 +982,7 @@ const browserOsBaseSideSections: BrowserRailSection<BrowserOsSideTab>[] = [
       {
         id: "models",
         label: "Models - OCI GenAI",
-        icon: DatabaseZap,
+        icon: BrainCircuit,
         pageTarget: {
           url: "https://docs.oracle.com/en-us/iaas/Content/generative-ai/pretrained-models.htm",
           title: "OCI Generative AI Models"
@@ -1672,8 +1000,7 @@ const browserOsBaseSideSections: BrowserRailSection<BrowserOsSideTab>[] = [
         },
         closeable: true,
         accent: "blue"
-      },
-      { id: "run-log", label: "Run history preview", icon: ClipboardList, agenticMode: "schedule", accent: "blue" }
+      }
     ]
   }
 ];
@@ -1924,48 +1251,6 @@ function BrowserOsSideTabButton({
   );
 }
 
-function BrowserOsAssistantContextCard({
-  item,
-  onClear
-}: {
-  item: BrowserAssistantContextItem;
-  onClear: () => void;
-}): ReactElement {
-  return (
-    <div className="mt-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-normal text-[#c2410c]">Attached browser context</p>
-          <p className="mt-1 truncate text-xs font-semibold text-[#171717]">{item.title}</p>
-        </div>
-        <button
-          type="button"
-          aria-label="Assistant context を解除"
-          onClick={onClear}
-          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#9a3412] transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-        >
-          <X aria-hidden="true" className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-[#9a3412]">
-        <span className="rounded-full bg-white px-2 py-1">{getBrowserAssistantContextSourceLabel(item.source)}</span>
-        {item.query ? <span className="rounded-full bg-white px-2 py-1">query: {item.query}</span> : null}
-      </div>
-      <p className="mt-2 break-all text-[11px] leading-4 text-[#9a3412]">{item.url}</p>
-      {item.matches.length > 0 ? (
-        <div className="mt-2 space-y-1">
-          {item.matches.slice(0, 3).map((match) => (
-            <div key={`${match.label}-${match.detail}`} className="rounded-md bg-white/80 px-2 py-1.5">
-              <p className="truncate text-[11px] font-semibold text-[#7c2d12]">{match.label}</p>
-              <p className="line-clamp-2 text-[11px] leading-4 text-[#9a3412]">{match.detail}</p>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function BrowserOsToolbarAction({
   label,
   icon: Icon,
@@ -2004,22 +1289,17 @@ function BrowserOsOnboardingPage({ onGetStarted }: { onGetStarted: () => void })
     {
       icon: BookOpen,
       title: "Oracle Docs / OCI Console Companion",
-      detail: "Oracle Docs、OCI Console、LiveLabs、GitHub sample を開きながら、要約・手順抽出・capture を行います。"
+      detail: "Oracle Docs、OCI Console、LiveLabs、GitHub sample を開きながら、ページ、選択テキスト、スクリーンショットを保存します。"
     },
     {
-      icon: Database,
-      title: "Oracle AI Vector Search / RAG",
-      detail: "capture と文書を Knowledge にまとめ、Local keyword と Oracle Vector Search adapter で grounded answer を確認します。"
-    },
-    {
-      icon: ClipboardList,
-      title: "PoC Package Generator",
-      detail: "workspace / playbook / connector 設定から README、SQL、Python、Terraform、proposal、follow-up email を生成します。"
+      icon: BrainCircuit,
+      title: "OCI GenAI Enterprise AI",
+      detail: "現在のページと capture を見ながら、OCI GenAI Enterprise AI の検討に必要な根拠を整理します。"
     },
     {
       icon: ShieldCheck,
-      title: "Local Connector Readiness",
-      detail: "OCI config、SQLcl、ADB wallet、Object Storage の readiness を確認します。secret は LLM / UI に渡しません。"
+      title: "Secrets excluded",
+      detail: "API key、token、password、顧客データを UI preview に含めない前提で扱います。"
     }
   ];
 
@@ -2032,8 +1312,8 @@ function BrowserOsOnboardingPage({ onGetStarted }: { onGetStarted: () => void })
         </div>
         <h1 className="mt-3 text-2xl font-semibold text-[#171717]">Oracle / OCI pre-sales cockpit</h1>
         <p className="mt-2 text-sm leading-6 text-[#52525b]">
-          Oracle AI Database、OCI Generative AI、Object Storage、SQLcl を中心に、顧客需求分析から demo / PoC 準備までを支援する
-          browser client です。Oracle 製品の理解と PoC を加速し、OCI 活用提案を後押しします。
+          OCI GenAI Enterprise AI を中心に、顧客需求分析から demo / PoC 準備までを支援する browser client です。
+          Oracle 製品の理解と PoC を加速し、OCI 活用提案を後押しします。
         </p>
 
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2066,20 +1346,128 @@ function BrowserOsOnboardingPage({ onGetStarted }: { onGetStarted: () => void })
   );
 }
 
+function CaptureChatPanel({
+  answer,
+  askState,
+  captureCount,
+  question,
+  status,
+  onAsk,
+  onQuestionChange,
+  onUsePrompt
+}: {
+  answer: GroundedKnowledgeAnswer | null;
+  askState: "idle" | "asking";
+  captureCount: number;
+  question: string;
+  status: string;
+  onAsk: (event: FormEvent<HTMLFormElement>) => void;
+  onQuestionChange: (value: string) => void;
+  onUsePrompt: (prompt: string) => void;
+}): ReactElement {
+  const suggestedPrompts = [
+    "保存済み captures から、OCI GenAI Enterprise AI の提案ポイントを3つ整理してください。",
+    "この captures で不足している前提、リスク、次に確認すべき証拠を整理してください。",
+    "顧客向けに説明するなら、どの capture を根拠に何を話すべきですか。"
+  ];
+  const canAsk = captureCount > 0 && question.trim().length > 0 && askState !== "asking";
+  const providerLabel = answer?.answerProvider === "oci-genai" ? "OCI GenAI" : "Local capture search";
+
+  return (
+    <section className="mt-5 rounded-md border border-[#e5e5e5] bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[#71717a]">Capture Chat</p>
+          <h2 className="mt-1 text-sm font-semibold text-[#171717]">Ask OCI GenAI</h2>
+        </div>
+        <span className="shrink-0 rounded-md bg-[#fff1eb] px-2 py-1 text-[11px] font-semibold text-[#f05a24]">
+          {captureCount} captures
+        </span>
+      </div>
+
+      <form onSubmit={onAsk} className="mt-4">
+        <label htmlFor="capture-chat-question" className="text-xs font-semibold uppercase tracking-normal text-[#71717a]">
+          Question
+        </label>
+        <textarea
+          id="capture-chat-question"
+          value={question}
+          onChange={(event) => onQuestionChange(event.target.value)}
+          rows={4}
+          placeholder="保存済み captures に基づいて質問してください。"
+          className="mt-2 min-h-[104px] w-full resize-none rounded-md border border-[#d4d4d4] bg-white px-3 py-2 text-sm leading-6 text-[#171717] outline-none transition-colors duration-200 placeholder:text-[#a1a1aa] focus:border-[#f05a24] focus:ring-2 focus:ring-[#fff1eb]"
+        />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {suggestedPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              onClick={() => onUsePrompt(prompt)}
+              className="cursor-pointer rounded-md border border-[#e5e5e5] bg-[#fbfbfa] px-2.5 py-1.5 text-left text-[11px] leading-4 text-[#52525b] transition-colors duration-200 hover:bg-[#fff7ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+
+        <Button type="submit" className="mt-3 w-full" disabled={!canAsk}>
+          <Send aria-hidden="true" className="h-4 w-4" />
+          {askState === "asking" ? "確認中" : "Captures に質問"}
+        </Button>
+      </form>
+
+      {captureCount === 0 ? (
+        <p className="mt-4 rounded-md border border-dashed border-[#d4d4d4] p-3 text-sm leading-6 text-[#71717a]">
+          Chat を使うには、先にページ、選択テキスト、またはスクリーンショットを Captures に保存してください。
+        </p>
+      ) : null}
+
+      {status ? <p className="mt-3 text-xs leading-5 text-[#71717a]">{status}</p> : null}
+
+      {answer ? (
+        <div className="mt-4 border-t border-[#e5e5e5] pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[#71717a]">Answer</p>
+            <span className="rounded-md bg-[#f4f4f5] px-2 py-1 text-[11px] font-medium text-[#52525b]">{providerLabel}</span>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#27272a]">{answer.answer}</p>
+
+          {answer.results.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-normal text-[#71717a]">Sources</p>
+              <ul className="mt-2 space-y-2">
+                {answer.results.map((result) => (
+                  <li key={result.chunk.id} className="rounded-md border border-[#e5e5e5] bg-[#fbfbfa] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-xs font-semibold text-[#171717]">{result.chunk.title}</p>
+                      <span className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-[#52525b]">
+                        {result.chunk.sourceKind}
+                      </span>
+                    </div>
+                    <p className="mt-1 break-all text-[11px] leading-4 text-[#71717a]">{result.chunk.sourceUrl}</p>
+                    <p className="mt-2 text-xs leading-5 text-[#52525b]">{result.excerpt}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function CaptureDetail({
   capture,
   workspaceName,
   clipboardStatus,
-  isInKnowledge,
-  onAddToKnowledge,
   onCopy,
   onExportMarkdown
 }: {
   capture: CapturedPage;
   workspaceName: string;
   clipboardStatus: string;
-  isInKnowledge: boolean;
-  onAddToKnowledge: () => void;
   onCopy: () => void;
   onExportMarkdown: () => void;
 }): ReactElement {
@@ -2128,11 +1516,6 @@ function CaptureDetail({
 
       {clipboardStatus ? <p className="mt-4 text-xs font-medium text-sky-700">{clipboardStatus}</p> : null}
 
-      <Button variant="outline" onClick={onAddToKnowledge} disabled={isInKnowledge} className="mt-4 w-full">
-        <ListPlus aria-hidden="true" className="h-4 w-4" />
-        {isInKnowledge ? "Knowledge に追加済み" : "Knowledge へ追加"}
-      </Button>
-
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onCopy}>
           <Copy aria-hidden="true" className="h-4 w-4" />
@@ -2147,719 +1530,11 @@ function CaptureDetail({
   );
 }
 
-function KnowledgePanel({
-  captureCount,
-  chunks,
-  question,
-  answer,
-  sources,
-  oracleVectorExecution,
-  adapterStatus,
-  isAnswering,
-  adapterId,
-  oracleVectorSearchConfig,
-  connectorDiagnostic,
-  isCheckingConnector,
-  documentImportStatus,
-  onAdapterChange,
-  onOracleVectorConfigChange,
-  onResetOracleVectorConfig,
-  onCheckConnector,
-  onQuestionChange,
-  onAddAll,
-  onClear,
-  onRemove,
-  onImportDocument,
-  onAsk,
-  onCopyAnswer,
-  onDownloadAnswer,
-  onCopyOracleVectorSql,
-  onDownloadOracleVectorSql
-}: {
-  captureCount: number;
-  chunks: KnowledgeChunk[];
-  question: string;
-  answer: string;
-  sources: KnowledgeSearchResult[];
-  oracleVectorExecution: OracleVectorSearchExecutionResult | null;
-  adapterStatus: string;
-  isAnswering: boolean;
-  adapterId: RagAdapterId;
-  oracleVectorSearchConfig: OracleVectorSearchConfig;
-  connectorDiagnostic: LocalConnectorDiagnostic | null;
-  isCheckingConnector: boolean;
-  documentImportStatus: string;
-  onAdapterChange: (adapter: RagAdapterId) => void;
-  onOracleVectorConfigChange: (patch: Partial<OracleVectorSearchConfig>) => void;
-  onResetOracleVectorConfig: () => void;
-  onCheckConnector: () => void;
-  onQuestionChange: (value: string) => void;
-  onAddAll: () => void;
-  onClear: () => void;
-  onRemove: (chunk: KnowledgeChunk) => void;
-  onImportDocument: () => void;
-  onAsk: () => void;
-  onCopyAnswer: () => void;
-  onDownloadAnswer: () => void;
-  onCopyOracleVectorSql: (sqlPreview: string) => void;
-  onDownloadOracleVectorSql: (sqlPreview: string) => void;
-}): ReactElement {
-  return (
-    <section className="mt-5 rounded-md border border-border bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Knowledge</p>
-          <h2 className="mt-1 text-sm font-semibold text-slate-950">RAG Workspace</h2>
-        </div>
-        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{chunks.length} chunks</span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <Button variant="outline" size="sm" onClick={onImportDocument}>
-          <Upload aria-hidden="true" className="h-4 w-4" />
-          文書追加
-        </Button>
-        <Button variant="outline" size="sm" onClick={onAddAll} disabled={captureCount === 0}>
-          <ListPlus aria-hidden="true" className="h-4 w-4" />
-          全件追加
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onClear} disabled={chunks.length === 0}>
-          クリア
-        </Button>
-      </div>
-
-      <div className="mt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Adapter</p>
-        <div className="mt-2 grid grid-cols-2 rounded-md border border-border bg-slate-50 p-1" role="group" aria-label="RAG adapter">
-          <button
-            type="button"
-            onClick={() => onAdapterChange("local-keyword")}
-            className={cn(
-              "cursor-pointer rounded px-3 py-2 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700",
-              adapterId === "local-keyword" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:bg-white"
-            )}
-          >
-            Local
-          </button>
-          <button
-            type="button"
-            onClick={() => onAdapterChange("oracle-vector-search")}
-            className={cn(
-              "cursor-pointer rounded px-3 py-2 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700",
-              adapterId === "oracle-vector-search" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:bg-white"
-            )}
-          >
-            Oracle Vector
-          </button>
-        </div>
-        {adapterId === "oracle-vector-search" ? (
-          <OracleVectorConfigPanel
-            config={oracleVectorSearchConfig}
-            connectorDiagnostic={connectorDiagnostic}
-            isCheckingConnector={isCheckingConnector}
-            onChange={onOracleVectorConfigChange}
-            onReset={onResetOracleVectorConfig}
-            onCheckConnector={onCheckConnector}
-          />
-        ) : null}
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {chunks.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border p-4 text-sm leading-6 text-slate-500">
-            captures を追加すると、RAG 用 chunk preview がここに表示されます。
-          </p>
-        ) : (
-          chunks.map((chunk, index) => (
-            <div key={chunk.id} className="rounded-md border border-border bg-slate-50 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-sky-800">Chunk {index + 1}</p>
-                  <p className="mt-1 truncate text-sm font-medium text-slate-950">{chunk.title}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onRemove(chunk)}
-                  className="shrink-0 cursor-pointer rounded-md p-1 text-slate-500 transition-colors duration-200 hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700"
-                  aria-label="Knowledge から削除"
-                >
-                  <X aria-hidden="true" className="h-4 w-4" />
-                </button>
-              </div>
-              <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{chunk.text}</p>
-              <p className="mt-2 truncate text-xs text-slate-500">{chunk.sourceUrl}</p>
-            </div>
-          ))
-        )}
-      </div>
-
-      {documentImportStatus ? <p className="mt-3 text-xs font-medium text-sky-700">{documentImportStatus}</p> : null}
-
-      <div className="mt-4">
-        <label htmlFor="knowledge-question" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Ask Knowledge
-        </label>
-        <div className="mt-2 flex gap-2">
-          <Input
-            id="knowledge-question"
-            value={question}
-            onChange={(event) => onQuestionChange(event.target.value)}
-            placeholder="PoC に使う要点を整理してください"
-          />
-          <Button variant="secondary" onClick={onAsk} disabled={chunks.length === 0 || isAnswering}>
-            <BrainCircuit aria-hidden="true" className="h-4 w-4" />
-            {isAnswering ? "検索中" : "Ask"}
-          </Button>
-        </div>
-      </div>
-
-      {answer ? (
-        <div className="mt-4 rounded-md border border-border bg-slate-50 p-3" aria-live="polite">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grounded Answer</p>
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-              {adapterStatus ? <span className="min-w-0 break-all text-[11px] font-medium text-slate-500">{adapterStatus}</span> : null}
-              <Button variant="ghost" size="sm" onClick={onCopyAnswer} className="h-7 px-2">
-                <Copy aria-hidden="true" className="h-4 w-4" />
-                コピー
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDownloadAnswer}
-                className="h-7 px-2"
-                aria-label="Grounded answer を Markdown で保存"
-                title="Grounded answer を Markdown で保存"
-              >
-                <FileDown aria-hidden="true" className="h-4 w-4" />
-                保存
-              </Button>
-            </div>
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{answer}</p>
-          {oracleVectorExecution ? (
-            <OracleVectorExecutionPreview
-              execution={oracleVectorExecution}
-              onCopySql={onCopyOracleVectorSql}
-              onDownloadSql={onDownloadOracleVectorSql}
-            />
-          ) : null}
-          {sources.length > 0 ? (
-            <div className="mt-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sources</p>
-              <ul className="mt-2 space-y-2">
-                {sources.map((source) => (
-                  <li key={source.chunk.id} className="rounded-md border border-border bg-white p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="min-w-0 truncate text-xs font-semibold text-slate-950">{source.chunk.title}</p>
-                      <span className="shrink-0 rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800">
-                        score {source.score}
-                      </span>
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{source.excerpt}</p>
-                    {source.matchedTerms.length > 0 ? (
-                      <p className="mt-2 truncate text-[11px] text-slate-500">matched: {source.matchedTerms.join(", ")}</p>
-                    ) : null}
-                    <p className="mt-1 truncate text-[11px] text-slate-500">{source.chunk.sourceUrl}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function PocAssetsPanel({
-  result,
-  selectedKind,
-  isGenerating,
-  onGenerate,
-  onSelectAsset,
-  onCopyAsset,
-  onCopyPackage,
-  onDownloadPackage
-}: {
-  result: GeneratePocAssetsResult | null;
-  selectedKind: GeneratedPocAsset["kind"];
-  isGenerating: boolean;
-  onGenerate: () => void;
-  onSelectAsset: (kind: GeneratedPocAsset["kind"]) => void;
-  onCopyAsset: (asset: GeneratedPocAsset) => void;
-  onCopyPackage: (result: GeneratePocAssetsResult) => void;
-  onDownloadPackage: (result: GeneratePocAssetsResult) => void;
-}): ReactElement {
-  const assetKindLabels: Record<GeneratedPocAsset["kind"], string> = {
-    readme: "README",
-    sql: "SQL",
-    python: "Python",
-    terraform: "Terraform",
-    checklist: "Checklist",
-    proposal: "Proposal",
-    email: "Email",
-    diagram: "Diagram",
-    env: "Env",
-    demo: "Demo",
-    troubleshooting: "Troubleshooting",
-    handover: "Handover"
-  };
-  const selectedAsset = result?.assets.find((asset) => asset.kind === selectedKind) ?? result?.assets[0] ?? null;
-
-  return (
-    <section className="mt-5 rounded-md border border-border bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">PoC Assets</p>
-          <h2 className="mt-1 text-sm font-semibold text-slate-950">Template Package</h2>
-        </div>
-        <Button variant="outline" size="sm" onClick={onGenerate} disabled={isGenerating}>
-          <FileDown aria-hidden="true" className="h-4 w-4" />
-          {isGenerating ? "生成中" : "生成"}
-        </Button>
-      </div>
-
-      {!result ? (
-        <p className="mt-4 rounded-md border border-dashed border-border p-4 text-sm leading-6 text-slate-500">
-          現在の workspace、playbook、connector 設定から PoC package の starter template を生成できます。
-        </p>
-      ) : (
-        <div className="mt-4">
-          <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
-            <div className="min-w-0">
-              <p className="text-sm leading-6 text-slate-700">{result.message}</p>
-              <p className="mt-1 text-[11px] font-medium text-slate-500">Generated {formatCheckedAt(result.generatedAt)}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
-                {result.assets.length} files
-              </span>
-              <Button variant="ghost" size="sm" onClick={() => onCopyPackage(result)} className="h-7 px-2">
-                <ClipboardList aria-hidden="true" className="h-4 w-4" />
-                一括コピー
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDownloadPackage(result)}
-                className="h-7 px-2"
-                aria-label="PoC package を Markdown で保存"
-                title="Markdown bundle として保存"
-              >
-                <FileDown aria-hidden="true" className="h-4 w-4" />
-                保存
-              </Button>
-            </div>
-          </div>
-
-          {result.warnings.length > 0 ? (
-            <ul className="mt-3 space-y-1 border-l-2 border-amber-300 pl-3">
-              {result.warnings.map((warning) => (
-                <li key={warning} className="text-xs leading-5 text-amber-800">
-                  {warning}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="PoC asset templates">
-            {result.assets.map((asset) => (
-              <button
-                key={`${asset.kind}-${asset.fileName}`}
-                type="button"
-                onClick={() => onSelectAsset(asset.kind)}
-                className={cn(
-                  "h-8 cursor-pointer rounded-md border px-3 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700",
-                  selectedAsset?.kind === asset.kind
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-border bg-white text-slate-700 hover:bg-slate-50"
-                )}
-              >
-                {assetKindLabels[asset.kind]}
-              </button>
-            ))}
-          </div>
-
-          {selectedAsset ? (
-            <div className="mt-4 border-t border-border pt-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950">{selectedAsset.title}</p>
-                  <p className="mt-1 break-all text-xs text-slate-500">{selectedAsset.fileName}</p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => onCopyAsset(selectedAsset)}>
-                  <Copy aria-hidden="true" className="h-4 w-4" />
-                  コピー
-                </Button>
-              </div>
-              <pre className="mt-3 max-h-72 min-h-[180px] overflow-auto rounded-md bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
-                <code>{selectedAsset.content}</code>
-              </pre>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function OracleVectorExecutionPreview({
-  execution,
-  onCopySql,
-  onDownloadSql
-}: {
-  execution: OracleVectorSearchExecutionResult;
-  onCopySql: (sqlPreview: string) => void;
-  onDownloadSql: (sqlPreview: string) => void;
-}): ReactElement {
-  if (!execution.plan) {
-    return (
-      <div className="mt-3 border-t border-border pt-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Oracle Vector Plan</p>
-        <p className="mt-2 text-xs leading-5 text-slate-600">{execution.validationErrors?.join(" ") ?? execution.message}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 border-t border-border pt-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Oracle Vector Plan</p>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-[11px] font-medium text-slate-500">{execution.status}</span>
-          <Button variant="ghost" size="sm" onClick={() => onCopySql(execution.plan?.sqlPreview ?? "")} className="h-7 px-2">
-            <Copy aria-hidden="true" className="h-4 w-4" />
-            SQL
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDownloadSql(execution.plan?.sqlPreview ?? "")}
-            className="h-7 px-2"
-            aria-label="Oracle Vector SQL を保存"
-            title="Oracle Vector SQL を保存"
-          >
-            <FileDown aria-hidden="true" className="h-4 w-4" />
-            保存
-          </Button>
-        </div>
-      </div>
-      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs leading-5 text-slate-600">
-        <CompactPlanRow label="Connection" value={execution.plan.connectionName} />
-        <CompactPlanRow label="Top K" value={String(execution.plan.topK)} />
-        <CompactPlanRow label="Table" value={execution.plan.tableName} />
-        <CompactPlanRow label="Embedding" value={execution.plan.embeddingModel} />
-      </dl>
-      <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-white p-3 text-[11px] leading-5 text-slate-700">
-        <code>{execution.plan.sqlPreview}</code>
-      </pre>
-      {execution.rows && execution.rows.length > 0 ? (
-        <div className="mt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Vector Search Results ({execution.rows.length})
-          </p>
-          <ul className="mt-2 space-y-2">
-            {execution.rows.map((row, index) => (
-              <li key={`${index}-${row.chunkText.slice(0, 16)}`} className="rounded-md border border-emerald-200 bg-emerald-50 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-[11px] font-semibold text-emerald-800">
-                    #{index + 1}
-                    {row.title ? ` ${row.title}` : ""}
-                  </span>
-                  {typeof row.distance === "number" ? (
-                    <span className="shrink-0 text-[11px] font-medium text-emerald-700">distance {row.distance.toFixed(4)}</span>
-                  ) : null}
-                </div>
-                <p className="mt-1 line-clamp-3 text-[11px] leading-4 text-slate-700">{row.chunkText}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CompactPlanRow({ label, value }: { label: string; value: string }): ReactElement {
-  return (
-    <div className="min-w-0">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="truncate font-medium text-slate-800">{value}</dd>
-    </div>
-  );
-}
-
-function OracleVectorConfigPanel({
-  config,
-  connectorDiagnostic,
-  isCheckingConnector,
-  onChange,
-  onReset,
-  onCheckConnector
-}: {
-  config: OracleVectorSearchConfig;
-  connectorDiagnostic: LocalConnectorDiagnostic | null;
-  isCheckingConnector: boolean;
-  onChange: (patch: Partial<OracleVectorSearchConfig>) => void;
-  onReset: () => void;
-  onCheckConnector: () => void;
-}): ReactElement {
-  const statusLabel = config.configured ? "設定済み" : "未設定";
-
-  return (
-    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold text-amber-900">Oracle Vector Search</p>
-          <p className="mt-1 text-xs leading-5 text-amber-800">
-            skeleton config only. 実 DB 呼び出しはまだ実装していません。
-          </p>
-        </div>
-        <span className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-medium text-amber-800">{statusLabel}</span>
-      </div>
-
-      <div className="mt-3 space-y-2">
-        <OracleConfigField
-          id="oracle-connection-name"
-          label="Connection"
-          value={config.connectionName ?? ""}
-          placeholder="adb-sales-demo"
-          onChange={(value) => onChange({ connectionName: value })}
-        />
-        <OracleConfigField
-          id="oracle-table-name"
-          label="Table"
-          value={config.tableName ?? ""}
-          placeholder="AI_LAUNCHPAD_CHUNKS"
-          onChange={(value) => onChange({ tableName: value })}
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <OracleConfigField
-            id="oracle-vector-column"
-            label="Vector column"
-            value={config.vectorColumn ?? ""}
-            placeholder="VECTOR_EMBEDDING"
-            onChange={(value) => onChange({ vectorColumn: value })}
-          />
-          <OracleConfigField
-            id="oracle-text-column"
-            label="Text column"
-            value={config.textColumn ?? ""}
-            placeholder="CHUNK_TEXT"
-            onChange={(value) => onChange({ textColumn: value })}
-          />
-        </div>
-        <div className="grid grid-cols-[1fr_88px] gap-2">
-          <OracleConfigField
-            id="oracle-embedding-model"
-            label="Embedding model"
-            value={config.embeddingModel ?? ""}
-            placeholder="cohere.embed-multilingual-v3.0"
-            onChange={(value) => onChange({ embeddingModel: value })}
-          />
-          <div>
-            <label htmlFor="oracle-top-k" className="text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-              Top K
-            </label>
-            <Input
-              id="oracle-top-k"
-              type="number"
-              min={1}
-              max={20}
-              value={String(config.topK ?? 3)}
-              onChange={(event) => onChange({ topK: Number(event.target.value) || 3 })}
-              className="mt-1 bg-white"
-            />
-          </div>
-        </div>
-      </div>
-
-      <Button variant="ghost" size="sm" onClick={onReset} className="mt-3 w-full bg-white/60">
-        設定をリセット
-      </Button>
-
-      <Button variant="outline" size="sm" onClick={onCheckConnector} disabled={isCheckingConnector} className="mt-2 w-full bg-white">
-        <DatabaseZap aria-hidden="true" className="h-4 w-4" />
-        {isCheckingConnector ? "確認中" : "Connector を確認"}
-      </Button>
-
-      {connectorDiagnostic ? (
-        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-amber-900">Local Connector</p>
-            <span className="text-[11px] font-medium text-amber-800">{formatCheckedAt(connectorDiagnostic.checkedAt)}</span>
-          </div>
-          <dl className="mt-2 space-y-1 text-xs leading-5 text-amber-900">
-            <ConnectorDiagnosticRow label="Health" value={`${connectorDiagnostic.health.status} / ${connectorDiagnostic.health.mode}`} />
-            <ConnectorDiagnosticRow label="OCI config" value={connectorDiagnostic.ociConfig.status} />
-            <ConnectorDiagnosticRow label="SQLcl" value={connectorDiagnostic.sqlcl.status} />
-            <ConnectorDiagnosticRow label="ADB wallet" value={connectorDiagnostic.adbWallet.status} />
-            <ConnectorDiagnosticRow label="Object Storage" value={connectorDiagnostic.objectStorage.status} />
-            {connectorDiagnostic.ociConfig.profile ? (
-              <ConnectorDiagnosticRow label="Profile" value={connectorDiagnostic.ociConfig.profile} />
-            ) : null}
-          </dl>
-          {connectorDiagnostic.health.message ? (
-            <p className="mt-2 text-xs leading-5 text-amber-800">{connectorDiagnostic.health.message}</p>
-          ) : null}
-          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.ociConfig.message}</p>
-          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.sqlcl.message}</p>
-          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.adbWallet.message}</p>
-          <p className="mt-1 text-xs leading-5 text-amber-800">{connectorDiagnostic.objectStorage.message}</p>
-          {connectorDiagnostic.ociConfig.configPath ? (
-            <p className="mt-2 break-all text-[11px] leading-5 text-amber-700">config: {connectorDiagnostic.ociConfig.configPath}</p>
-          ) : null}
-          {connectorDiagnostic.ociConfig.keyFilePath ? (
-            <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">key: {connectorDiagnostic.ociConfig.keyFilePath}</p>
-          ) : null}
-          {connectorDiagnostic.sqlcl.executablePath ? (
-            <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">sqlcl: {connectorDiagnostic.sqlcl.executablePath}</p>
-          ) : null}
-          {connectorDiagnostic.adbWallet.walletPath ? (
-            <p className="mt-1 break-all text-[11px] leading-5 text-amber-700">wallet: {connectorDiagnostic.adbWallet.walletPath}</p>
-          ) : null}
-          {connectorDiagnostic.ociConfig.checks?.length ? (
-            <ul className="mt-2 space-y-1">
-              {connectorDiagnostic.ociConfig.checks.map((check) => (
-                <li key={check.name} className="flex gap-2 text-[11px] leading-5 text-amber-800">
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
-                  <span className="min-w-0">{check.message}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : (
-        <p className="mt-3 text-xs leading-5 text-amber-800">Local Connector health と OCI config の接続状態をここで確認できます。</p>
-      )}
-    </div>
-  );
-}
-
-function OracleConfigField({
-  id,
-  label,
-  value,
-  placeholder,
-  onChange
-}: {
-  id: string;
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
-}): ReactElement {
-  return (
-    <div>
-      <label htmlFor={id} className="text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-        {label}
-      </label>
-      <Input
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="mt-1 bg-white"
-      />
-    </div>
-  );
-}
-
 function ContextRow({ label, value }: { label: string; value: string }): ReactElement {
   return (
     <div className="grid grid-cols-[82px_1fr] gap-2">
       <dt className="text-slate-500">{label}</dt>
       <dd className="min-w-0 truncate font-medium text-slate-800">{value}</dd>
     </div>
-  );
-}
-
-function ConnectorDiagnosticRow({ label, value }: { label: string; value: string }): ReactElement {
-  return (
-    <div className="grid grid-cols-[78px_1fr] gap-2">
-      <dt className="text-amber-700">{label}</dt>
-      <dd className="min-w-0 truncate font-medium text-amber-950">{value}</dd>
-    </div>
-  );
-}
-
-function formatCheckedAt(value: string): string {
-  return new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  }).format(new Date(value));
-}
-
-function AssistantOutput({
-  mode,
-  summary,
-  checklist,
-  explanation,
-  askPageAnswer,
-  askPageSources
-}: {
-  mode: "idle" | "summary" | "checklist" | "selection" | "ask";
-  summary: string;
-  checklist: string[];
-  explanation: string;
-  askPageAnswer: string;
-  askPageSources: Array<{ title: string; url: string }>;
-}): ReactElement {
-  if (mode === "idle") {
-    return (
-      <section className="mt-5 rounded-md border border-dashed border-border p-4">
-        <p className="text-sm leading-6 text-slate-500">
-          ページ要約、手順化、選択テキスト説明、workspace 保存をここから実行できます。
-        </p>
-      </section>
-    );
-  }
-
-  if (mode === "checklist") {
-    return (
-      <section className="mt-5 rounded-md border border-border bg-white p-4">
-        <h2 className="text-sm font-semibold">抽出 checklist</h2>
-        <ol className="mt-3 space-y-2">
-          {checklist.map((item, index) => (
-            <li key={item} className="flex gap-3 text-sm leading-6 text-slate-700">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold">
-                {index + 1}
-              </span>
-              {item}
-            </li>
-          ))}
-        </ol>
-      </section>
-    );
-  }
-
-  if (mode === "ask") {
-    return (
-      <section className="mt-5 rounded-md border border-border bg-white p-4">
-        <h2 className="text-sm font-semibold">ページ回答</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-700">{askPageAnswer}</p>
-        {askPageSources.length > 0 ? (
-          <div className="mt-4 rounded-md bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sources</p>
-            <ul className="mt-2 space-y-1">
-              {askPageSources.map((source) => (
-                <li key={`${source.title}-${source.url}`} className="truncate text-xs text-slate-600">
-                  {source.title}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
-    );
-  }
-
-  return (
-    <section className="mt-5 rounded-md border border-border bg-white p-4">
-      <h2 className="text-sm font-semibold">{mode === "summary" ? "ページ要約" : "選択テキスト説明"}</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-700">{mode === "summary" ? summary : explanation}</p>
-    </section>
   );
 }

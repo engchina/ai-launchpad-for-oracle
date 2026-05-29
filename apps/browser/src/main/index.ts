@@ -8,23 +8,24 @@ import {
   dialog,
   ipcMain,
   Menu,
+  safeStorage,
   shell,
   type Input,
   type MenuItemConstructorOptions,
   type WebContents
 } from "electron";
 import type {
-  AskPagePayload,
   BrowserViewCommand,
   CapturedPagePayload,
-  OracleVectorSearchExecutionPayload,
+  SaveOciGenAiSettingsPayload,
   RagAskResult,
   RagAskPayload,
   SaveScreenshotPayload,
-  SaveSelectionPayload
+  SaveSelectionPayload,
+  TestOciGenAiSettingsResult
 } from "../shared/api";
 import { ingestTextDocument, MAX_TEXT_DOCUMENT_BYTES } from "../shared/documentIngestion";
-import { answerRagQuestion, createOracleVectorSearchRagAnswer, normalizeRagQuestion } from "../shared/rag";
+import { answerRagQuestion } from "../shared/rag";
 import {
   getNextBrowserViewZoomFactor,
   resolveBrowserViewZoomShortcut,
@@ -37,7 +38,14 @@ import {
   listStoredKnowledgeDocuments,
   saveKnowledgeDocument
 } from "./localKnowledgeStore";
-import { generateOciGenAiAnswer, type GenAiContext } from "./ociGenAiExecutor";
+import { generateOciGenAiAnswer, testOciGenAiConnection, type GenAiContext } from "./ociGenAiExecutor";
+import {
+  clearOciGenAiApiKey,
+  loadOciGenAiRuntimeSettings,
+  loadOciGenAiSettings,
+  saveOciGenAiSettings,
+  type OciGenAiSecretCodec
+} from "./ociGenAiSettingsStore";
 
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
@@ -47,6 +55,28 @@ const browserWorkspaceService = new BrowserWorkspaceService(getLocalStoreBaseDir
 
 function getLocalStoreBaseDir(): string {
   return app.getPath("userData");
+}
+
+function createOciGenAiSecretCodec(): OciGenAiSecretCodec {
+  if (safeStorage.isEncryptionAvailable()) {
+    return {
+      kind: "electron-safe-storage",
+      encrypt: (plainText) => safeStorage.encryptString(plainText).toString("base64"),
+      decrypt: (storedValue) => {
+        try {
+          return safeStorage.decryptString(Buffer.from(storedValue, "base64"));
+        } catch {
+          return null;
+        }
+      }
+    };
+  }
+
+  return {
+    kind: "local-file",
+    encrypt: (plainText) => plainText,
+    decrypt: (storedValue) => storedValue
+  };
 }
 
 function sendBrowserViewCommand(mainWindow: BrowserWindow, command: BrowserViewCommand): void {
@@ -205,17 +235,11 @@ function createWindow(): void {
 }
 
 function collectGenAiContexts(result: RagAskResult): GenAiContext[] {
-  const fromResults: GenAiContext[] = result.results.map((item) => ({
+  return result.results.map((item) => ({
     title: item.chunk.title,
     ...(item.chunk.sourceUrl ? { sourceUrl: item.chunk.sourceUrl } : {}),
     text: item.excerpt || item.chunk.text
-  }));
-  const fromRows: GenAiContext[] = (result.oracleVectorSearch?.rows ?? []).map((row) => ({
-    ...(row.title ? { title: row.title } : {}),
-    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl } : {}),
-    text: row.chunkText
-  }));
-  return [...fromResults, ...fromRows].filter((context) => context.text.trim().length > 0);
+  })).filter((context) => context.text.trim().length > 0);
 }
 
 // 検索済み context がある場合のみ、OCI GenAI で回答本文を実生成に差し替える。
@@ -226,7 +250,8 @@ async function enrichAnswerWithOciGenAi(result: RagAskResult): Promise<RagAskRes
     return result;
   }
 
-  const generation = await generateOciGenAiAnswer(result.question, contexts, process.env);
+  const settings = await loadOciGenAiRuntimeSettings(getLocalStoreBaseDir(), createOciGenAiSecretCodec());
+  const generation = await generateOciGenAiAnswer(result.question, contexts, process.env, settings);
   if (!generation.ok) {
     return result;
   }
@@ -235,41 +260,36 @@ async function enrichAnswerWithOciGenAi(result: RagAskResult): Promise<RagAskRes
 }
 
 async function handleAskKnowledge(payload: RagAskPayload): Promise<RagAskResult> {
-  if (payload.adapter !== "oracle-vector-search") {
-    return enrichAnswerWithOciGenAi(answerRagQuestion(payload));
-  }
+  return enrichAnswerWithOciGenAi(answerRagQuestion(payload));
+}
 
-  const startedAt = performance.now();
-  const question = normalizeRagQuestion(payload.question);
-
-  try {
-    const oracleVectorSearch = await localConnector.oracleVectorSearch({
-      question,
-      config: payload.oracleVectorSearch,
-      maxResults: payload.maxResults
-    });
-
-    const baseResult = createOracleVectorSearchRagAnswer(
-      {
-        ...payload,
-        question
-      },
-      oracleVectorSearch,
-      Math.round(performance.now() - startedAt)
-    );
-
-    return await enrichAnswerWithOciGenAi(baseResult);
-  } catch {
+async function handleTestOciGenAiSettings(): Promise<TestOciGenAiSettingsResult> {
+  const testedAt = new Date().toISOString();
+  const codec = createOciGenAiSecretCodec();
+  const settings = await loadOciGenAiSettings(getLocalStoreBaseDir(), codec);
+  if (!settings.readiness.ready) {
     return {
-      question,
-      answer: "Local Connector の Oracle Vector Search 呼び出しに失敗しました。worker process と IPC 設定を確認してください。",
-      results: [],
-      status: "adapter_unavailable",
-      adapter: "oracle-vector-search",
-      adapterStatus: "unavailable",
-      latencyMs: Math.round(performance.now() - startedAt)
+      ok: false,
+      settings,
+      testedAt,
+      message: `接続テストに必要な設定が不足しています: ${settings.readiness.missing.join(", ")}`
     };
   }
+
+  const runtimeSettings = await loadOciGenAiRuntimeSettings(getLocalStoreBaseDir(), codec);
+  const testResult = await testOciGenAiConnection({
+    baseUrl: runtimeSettings.baseUrl,
+    apiKey: runtimeSettings.apiKey,
+    model: runtimeSettings.model,
+    project: runtimeSettings.project
+  });
+
+  return {
+    ok: testResult.ok,
+    settings,
+    testedAt,
+    message: testResult.ok ? "保存済み設定で OCI GenAI endpoint に接続できました。" : testResult.reason
+  };
 }
 
 app.whenReady().then(() => {
@@ -292,8 +312,6 @@ app.whenReady().then(() => {
   ipcMain.handle("browser:save-screenshot", (_, payload: SaveScreenshotPayload) => browserWorkspaceService.saveScreenshot(payload));
 
   ipcMain.handle("browser:clear-captures", () => browserWorkspaceService.clearCaptures());
-
-  ipcMain.handle("browser:ask-page", (_, payload: AskPagePayload) => browserWorkspaceService.askPage(payload));
 
   ipcMain.handle("rag:ask-knowledge", (_, payload: RagAskPayload) => handleAskKnowledge(payload));
 
@@ -354,19 +372,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle("local-connector:health", () => localConnector.health());
 
-  ipcMain.handle("local-connector:oci-check-config", () => localConnector.ociCheckConfig());
-
-  ipcMain.handle("local-connector:sqlcl-check", () => localConnector.sqlclCheck());
-
-  ipcMain.handle("local-connector:adb-wallet-check", () => localConnector.adbWalletCheck());
-
-  ipcMain.handle("local-connector:object-storage-check", () => localConnector.objectStorageCheck());
-
   ipcMain.handle("local-connector:generate-poc-assets", (_, payload) => localConnector.generatePocAssets(payload));
 
-  ipcMain.handle("local-connector:oracle-vector-search", (_, payload: OracleVectorSearchExecutionPayload) =>
-    localConnector.oracleVectorSearch(payload)
-  );
+  ipcMain.handle("oci-genai-settings:load", () => loadOciGenAiSettings(getLocalStoreBaseDir(), createOciGenAiSecretCodec()));
+
+  ipcMain.handle("oci-genai-settings:save", async (_, payload: SaveOciGenAiSettingsPayload) => ({
+    ok: true,
+    settings: await saveOciGenAiSettings(getLocalStoreBaseDir(), payload, createOciGenAiSecretCodec())
+  }));
+
+  ipcMain.handle("oci-genai-settings:test", () => handleTestOciGenAiSettings());
+
+  ipcMain.handle("oci-genai-settings:clear-api-key", async () => ({
+    ok: true,
+    settings: await clearOciGenAiApiKey(getLocalStoreBaseDir(), createOciGenAiSecretCodec()),
+    clearedAt: new Date().toISOString()
+  }));
 
   createWindow();
 

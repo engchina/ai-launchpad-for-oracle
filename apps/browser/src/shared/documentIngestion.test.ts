@@ -4,10 +4,10 @@ import { ingestTextDocument, MAX_TEXT_DOCUMENT_BYTES } from "./documentIngestion
 
 test("ingestTextDocument creates document chunks from markdown headings", () => {
   const result = ingestTextDocument({
-    fileName: "rag-plan.md",
+    fileName: "genai-plan.md",
     documentId: "document-test",
     importedAt: "2026-05-14T00:00:00.000Z",
-    text: "# RAG PoC\n\nVector index demo flow.\n\n## Checklist\n\n- Load documents\n- Run similarity query"
+    text: "# GenAI PoC\n\nEnterprise AI demo flow.\n\n## Checklist\n\n- Load documents\n- Review source context"
   });
 
   assert.equal(result.ok, true);
@@ -15,10 +15,10 @@ test("ingestTextDocument creates document chunks from markdown headings", () => 
     return;
   }
 
-  assert.equal(result.document.title, "RAG PoC");
+  assert.equal(result.document.title, "GenAI PoC");
   assert.equal(result.chunks.length, 2);
   assert.equal(result.chunks[0].sourceKind, "document");
-  assert.match(result.chunks[0].text, /Vector index demo/);
+  assert.match(result.chunks[0].text, /Enterprise AI demo/);
   assert.match(result.chunks[1].title, /Checklist/);
 });
 
@@ -26,7 +26,7 @@ test("ingestTextDocument accepts txt files without markdown headings", () => {
   const result = ingestTextDocument({
     fileName: "notes.txt",
     documentId: "document-notes",
-    text: "Oracle AI Database notes\n\nEmbedding model and vector search prerequisites."
+    text: "OCI GenAI notes\n\nEndpoint, model, and API key owner prerequisites."
   });
 
   assert.equal(result.ok, true);
@@ -36,7 +36,7 @@ test("ingestTextDocument accepts txt files without markdown headings", () => {
 
   assert.equal(result.document.title, "notes");
   assert.equal(result.chunks.length, 1);
-  assert.match(result.chunks[0].text, /Embedding model/);
+  assert.match(result.chunks[0].text, /API key owner/);
 });
 
 test("ingestTextDocument rejects empty or unsupported documents", () => {

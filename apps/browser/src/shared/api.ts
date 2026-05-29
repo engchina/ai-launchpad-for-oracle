@@ -1,5 +1,4 @@
 import type { IngestTextDocumentResult } from "./documentIngestion";
-import type { OracleVectorSearchExecutionPayload, OracleVectorSearchExecutionResult } from "./oracleVectorSearch";
 import type { RagAskPayload, RagAskResult } from "./rag";
 
 export type PageSourceType = "oracle_docs" | "oci_console" | "livelabs" | "github" | "other";
@@ -14,14 +13,6 @@ export type {
 } from "./documentIngestion";
 
 export type {
-  OracleVectorSearchExecutionPayload,
-  OracleVectorSearchExecutionResult,
-  OracleVectorSearchPlan
-} from "./oracleVectorSearch";
-
-export type {
-  OracleVectorSearchConfig,
-  RagAdapterHealth,
   RagAdapterId,
   RagAdapterStatus,
   RagAskPayload,
@@ -30,27 +21,6 @@ export type {
   RagSearchResult,
   RagSourceKind
 } from "./rag";
-
-export type {
-  BrowserAgentAction,
-  BrowserAgentActionKind,
-  BrowserAgentActionRisk,
-  BrowserAgentApprovalState,
-  BrowserAgentPlan,
-  BrowserAgentPlanContext,
-  BrowserAgentPlanStep,
-  BrowserAgentStepStatus,
-  CreateBrowserAgentPlanPayload
-} from "./agentActions";
-
-export type {
-  BrowserAgentRun,
-  BrowserAgentRunEvent,
-  BrowserAgentRunEventLevel,
-  BrowserAgentRunStatus,
-  BrowserAgentRunStep,
-  BrowserAgentRunStepStatus
-} from "./agentRuns";
 
 export type CapturedPagePayload = {
   workspaceId: string;
@@ -90,21 +60,6 @@ export type ClearCapturesResult = {
   clearedAt: string;
 };
 
-export type AskPagePayload = {
-  workspaceId: string;
-  url: string;
-  title: string;
-  prompt: string;
-};
-
-export type AskPageResult = {
-  answer: string;
-  sources: Array<{
-    title: string;
-    url: string;
-  }>;
-};
-
 export type SaveSelectionPayload = {
   workspaceId: string;
   url: string;
@@ -142,60 +97,8 @@ export type LocalConnectorHealth = {
   message?: string;
 };
 
-export type OciCheckConfigResult = {
-  status: "ready" | "not-configured" | "invalid" | "unavailable";
-  message: string;
-  profile?: string;
-  configPath?: string;
-  keyFilePath?: string;
-  missingFields?: string[];
-  checks?: Array<{
-    name: string;
-    ok: boolean;
-    message: string;
-  }>;
-};
-
-export type SqlclCheckResult = {
-  status: "ready" | "not-configured" | "unavailable";
-  message: string;
-  executablePath?: string;
-  checks?: Array<{
-    name: string;
-    ok: boolean;
-    message: string;
-  }>;
-};
-
-export type AdbWalletCheckResult = {
-  status: "ready" | "not-configured" | "invalid" | "unavailable";
-  message: string;
-  walletPath?: string;
-  checks?: Array<{
-    name: string;
-    ok: boolean;
-    message: string;
-  }>;
-};
-
-export type ObjectStorageCheckResult = {
-  status: "ready" | "not-configured" | "invalid" | "unavailable";
-  message: string;
-  namespace?: string;
-  bucketName?: string;
-  region?: string;
-  checks?: Array<{
-    name: string;
-    ok: boolean;
-    message: string;
-  }>;
-};
-
 export type PocAssetKind =
   | "readme"
-  | "sql"
-  | "python"
-  | "terraform"
   | "checklist"
   | "proposal"
   | "email"
@@ -209,12 +112,7 @@ export type GeneratePocAssetsPayload = {
   workspaceName?: string;
   playbookTitle?: string;
   useCase?: string;
-  dbSchema?: string;
-  vectorTable?: string;
-  objectStorageNamespace?: string;
-  objectStorageBucket?: string;
-  ociRegion?: string;
-  embeddingModel?: string;
+  genAiModel?: string;
 };
 
 export type GeneratedPocAsset = {
@@ -232,6 +130,50 @@ export type GeneratePocAssetsResult = {
   warnings: string[];
 };
 
+export type OciGenAiSettingsStorageKind = "electron-safe-storage" | "local-file";
+
+export type OciGenAiSettingsConfig = {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+  project: string;
+};
+
+export type OciGenAiSettingsReadiness = {
+  ready: boolean;
+  missing: string[];
+};
+
+export type OciGenAiSettingsState = {
+  config: OciGenAiSettingsConfig;
+  hasApiKey: boolean;
+  storageKind: OciGenAiSettingsStorageKind;
+  updatedAt?: string;
+  readiness: OciGenAiSettingsReadiness;
+};
+
+export type SaveOciGenAiSettingsPayload = Pick<OciGenAiSettingsConfig, "baseUrl" | "model" | "project"> & {
+  apiKey?: string;
+};
+
+export type SaveOciGenAiSettingsResult = {
+  ok: true;
+  settings: OciGenAiSettingsState;
+};
+
+export type TestOciGenAiSettingsResult = {
+  ok: boolean;
+  settings: OciGenAiSettingsState;
+  testedAt: string;
+  message: string;
+};
+
+export type ClearOciGenAiApiKeyResult = {
+  ok: true;
+  settings: OciGenAiSettingsState;
+  clearedAt: string;
+};
+
 export type AiLaunchpadApi = {
   browserViewCommands: {
     onCommand: (handler: (command: BrowserViewCommand) => void) => () => void;
@@ -242,7 +184,6 @@ export type AiLaunchpadApi = {
     saveSelection: (payload: SaveSelectionPayload) => Promise<CapturedPageResult>;
     saveScreenshot: (payload: SaveScreenshotPayload) => Promise<CapturedPageResult>;
     clearCaptures: () => Promise<ClearCapturesResult>;
-    askPage: (payload: AskPagePayload) => Promise<AskPageResult>;
   };
   ragAdapter: {
     askKnowledge: (payload: RagAskPayload) => Promise<RagAskResult>;
@@ -254,11 +195,12 @@ export type AiLaunchpadApi = {
   };
   localConnector: {
     health: () => Promise<LocalConnectorHealth>;
-    ociCheckConfig: () => Promise<OciCheckConfigResult>;
-    sqlclCheck: () => Promise<SqlclCheckResult>;
-    adbWalletCheck: () => Promise<AdbWalletCheckResult>;
-    objectStorageCheck: () => Promise<ObjectStorageCheckResult>;
     generatePocAssets: (payload: GeneratePocAssetsPayload) => Promise<GeneratePocAssetsResult>;
-    oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) => Promise<OracleVectorSearchExecutionResult>;
+  };
+  ociGenAiSettings: {
+    load: () => Promise<OciGenAiSettingsState>;
+    save: (payload: SaveOciGenAiSettingsPayload) => Promise<SaveOciGenAiSettingsResult>;
+    test: () => Promise<TestOciGenAiSettingsResult>;
+    clearApiKey: () => Promise<ClearOciGenAiApiKeyResult>;
   };
 };

@@ -1,39 +1,138 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="AI Launchpad for Oracle Minimal Icon">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="AI Launchpad for Oracle Minimal Icon">
   <defs>
-    <!-- Background Gradient (Rich Charcoal Dark) -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#121214" />
-      <stop offset="100%" stop-color="#1c1c1f" />
+    <!-- Background Gradients -->
+    <radialGradient id="outerBg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#2a2c32" />
+      <stop offset="100%" stop-color="#111215" />
+    </radialGradient>
+    <linearGradient id="innerBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2f3137" />
+      <stop offset="100%" stop-color="#141517" />
     </linearGradient>
 
-    <!-- Premium Redwood Copper & Terracotta Gradient -->
-    <linearGradient id="redwoodGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#8C2D19" />
-      <stop offset="60%" stop-color="#C74B31" />
-      <stop offset="100%" stop-color="#F39C6B" />
+    <!-- Copper Ribbon Facet Gradients (Lighting from Top-Left) -->
+    <!-- Sector A: Top-Left (Fully lit outer, shadowed inner) -->
+    <linearGradient id="copper_out_sectorA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3a890" />
+      <stop offset="50%" stop-color="#e08266" />
+      <stop offset="100%" stop-color="#b35c46" />
+    </linearGradient>
+    <linearGradient id="copper_in_sectorA" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4a180d" />
+      <stop offset="100%" stop-color="#8c3321" />
     </linearGradient>
 
-    <!-- Warm Sand Glow Accent -->
-    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F5E8DD" />
-      <stop offset="100%" stop-color="#D9B48F" stop-opacity="0.3" />
+    <!-- Sector B: Bottom-Left (Transitioning from lit to shadow) -->
+    <linearGradient id="copper_out_sectorB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b35c46" />
+      <stop offset="100%" stop-color="#601e12" />
     </linearGradient>
+    <linearGradient id="copper_in_sectorB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b06b5a" />
+      <stop offset="100%" stop-color="#803828" />
+    </linearGradient>
+
+    <!-- Sector C: Bottom-Right (Deep shadow outer, lit inner) -->
+    <linearGradient id="copper_out_sectorC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4a180d" />
+      <stop offset="100%" stop-color="#300f07" />
+    </linearGradient>
+    <linearGradient id="copper_in_sectorC" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#a04a35" />
+      <stop offset="100%" stop-color="#d4826b" />
+    </linearGradient>
+
+    <!-- Ridge Highlight Gradient -->
+    <linearGradient id="ridge_highlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+      <stop offset="30%" stop-color="#ffe6d9" stop-opacity="0.4" />
+      <stop offset="70%" stop-color="#d4826b" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.3" />
+    </linearGradient>
+
+    <!-- Gold Arrow Gradients -->
+    <linearGradient id="gold_left" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e5bf60" />
+      <stop offset="50%" stop-color="#fcedba" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+    <linearGradient id="gold_right" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ab7e27" />
+      <stop offset="100%" stop-color="#543809" />
+    </linearGradient>
+    <linearGradient id="gold_side" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4a3307" />
+      <stop offset="100%" stop-color="#1d1201" />
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="ambientShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+    <filter id="elementShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#000000" flood-opacity="0.75" />
+    </filter>
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" />
+    </filter>
   </defs>
 
-  <!-- Rounded Corner Background -->
-  <rect width="128" height="128" rx="32" fill="url(#bgGrad)" />
+  <!-- Outer Rounded Canvas Background -->
+  <rect width="1024" height="1024" rx="220" fill="#0d0e10" />
+  <rect x="8" y="8" width="1008" height="1008" rx="212" fill="url(#outerBg)" />
 
-  <!-- Stylized Elegant "O" Loop that launches upwards -->
-  <g transform="translate(64, 68)">
-    <!-- Glow Underlay -->
-    <path d="M-28 12 C-45 -5, -45 -32, -28 -49 C-11 -66, 16 -66, 33 -49 C46 -36, 48 -18, 38 -4 L48 6 C64 -14, 61 -42, 41 -62 C21 -82, -11 -82, -31 -62 C-51 -42, -51 -14, -31 6 C-17 20, 8 22, 22 10 L12 0 C2 8, -16 6, -28 12 Z"
-          fill="url(#glowGrad)" opacity="0.15" filter="blur(2px)" />
+  <!-- Inner Raised Slate Base Plate -->
+  <rect x="132" y="132" width="760" height="760" rx="150" fill="url(#innerBg)" filter="url(#ambientShadow)" />
+  <rect x="132" y="132" width="760" height="760" rx="150" fill="none" stroke="#3b3e45" stroke-width="4" opacity="0.4" />
 
-    <!-- Main Interlocking O-Loop & Launch Arrow -->
-    <path d="M-25 15 C-42 0, -42 -28, -25 -45 C-8 -62, 20 -62, 37 -45 C47 -35, 49 -20, 42 -8 L54 4 C66 -13, 62 -38, 45 -55 C28 -72, -2 -72, -20 -55 C-38 -38, -38 -10, -20 8 C-8 20, 12 21, 24 11 L16 3 C7 10, -11 8, -25 15 Z"
-          fill="url(#redwoodGrad)" />
+  <!-- Main Symbol Group (with soft drop shadow) -->
+  <g filter="url(#elementShadow)">
+    <!-- Behind-the-scenes loop shadow for real depth -->
+    <path d="M 512,530 m -220,0 a 220,220 0 1,0 440,0 a 220,220 0 1,0 -440,0" fill="none" stroke="#000000" stroke-width="90" opacity="0.5" filter="url(#softBlur)" />
 
-    <!-- Rising Core / Arrow head pointing to top-right (Launch) -->
-    <path d="M28 -49 L46 -49 L46 -31 L40 -37 L24 -21 L16 -29 L32 -45 Z" fill="#F5E8DD" />
+    <!-- 3D Ribbon / Copper Loop -->
+    <g>
+      <!-- Sector A -->
+      <path d="M 568.9,317.5 L 584.5,259.5 A 280 280 0 0 0 236.3,481.4 L 295.3,491.8 A 220 220 0 0 1 568.9,317.5 Z" fill="url(#copper_out_sectorA)" />
+      <path d="M 553.4,375.5 L 568.9,317.5 A 220 220 0 0 0 295.3,491.8 L 354.4,502.2 A 160 160 0 0 1 553.4,375.5 Z" fill="url(#copper_in_sectorA)" />
+
+      <!-- Sector B -->
+      <path d="M 295.3,491.8 L 236.3,481.4 A 280 280 0 0 0 512.0,810.0 L 512.0,750.0 A 220 220 0 0 1 295.3,491.8 Z" fill="url(#copper_out_sectorB)" />
+      <path d="M 354.4,502.2 L 295.3,491.8 A 220 220 0 0 0 512.0,750.0 L 512.0,690.0 A 160 160 0 0 1 354.4,502.2 Z" fill="url(#copper_in_sectorB)" />
+
+      <!-- Sector C -->
+      <path d="M 512.0,750.0 L 512.0,810.0 A 280 280 0 0 0 765.8,411.7 L 711.4,437.0 A 220 220 0 0 1 512.0,750.0 Z" fill="url(#copper_out_sectorC)" />
+      <path d="M 512.0,690.0 L 512.0,750.0 A 220 220 0 0 0 711.4,437.0 L 657.0,462.4 A 160 160 0 0 1 512.0,690.0 Z" fill="url(#copper_in_sectorC)" />
+
+      <!-- Chiseled Center Ridge Highlights -->
+      <path d="M 568.9,317.5 A 220 220 0 0 0 295.3,491.8 A 220 220 0 0 0 512.0,750.0 A 220 220 0 0 0 711.4,437.0" fill="none" stroke="url(#ridge_highlight)" stroke-width="4" stroke-linecap="round" />
+    </g>
+
+    <!-- 3D Gold Launch Arrow -->
+    <g>
+      <!-- Arrow Local Drop Shadow -->
+      <path d="M 817.1,270.1 L 661.4,298.4 L 668.4,362.0 L 672.0,492.4 L 726.4,467.0 L 780.8,441.7 L 725.0,418.6 L 788.6,425.6 Z" fill="#000000" opacity="0.6" filter="url(#softBlur)" />
+
+      <!-- Side Extrusion Wall (3D depth) -->
+      <!-- Right Wing Side Wall -->
+      <path d="M 773.6,400.6 L 785.6,412.6 L 722.0,405.6 L 710.0,393.6 Z" fill="url(#gold_side)" />
+      <!-- Right Shaft Side Wall -->
+      <path d="M 710.0,393.6 L 722.0,405.6 L 777.8,428.7 L 765.8,416.7 Z" fill="url(#gold_side)" />
+
+      <!-- Arrow Head - Left Facet (Specular Gold) -->
+      <path d="M 802.1,245.1 L 646.4,273.4 L 653.4,337.0 L 660.7,386.5 Z" fill="url(#gold_left)" />
+
+      <!-- Arrow Head - Right Facet (Shadow Gold) -->
+      <path d="M 802.1,245.1 L 773.6,400.6 L 710.0,393.6 L 660.7,386.5 Z" fill="url(#gold_right)" />
+
+      <!-- Arrow Shaft - Left Facet -->
+      <path d="M 653.4,337.0 L 657.0,467.4 L 711.4,442.0 L 660.7,386.5 Z" fill="url(#gold_left)" />
+
+      <!-- Arrow Shaft - Right Facet -->
+      <path d="M 710.0,393.6 L 765.8,416.7 L 711.4,442.0 L 660.7,386.5 Z" fill="url(#gold_right)" />
+
+      <!-- Center Ridge Highlight Crease -->
+      <path d="M 802.1,245.1 L 660.7,386.5 L 711.4,442.0" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.6" stroke-linecap="round" />
+    </g>
   </g>
 </svg>

@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -50,11 +50,49 @@ test("local capture store writes screenshot files and clears them", async () => 
     });
 
     assert.ok(capture.screenshotPath);
-    assert.match(capture.screenshotDataUrl ?? "", /^file:\/\//);
+    assert.equal(capture.screenshotDataUrl, dataUrl);
     assert.match(await readFile(capture.screenshotPath!, "utf8"), /<svg/);
 
     await clearStoredCaptures(dir);
     assert.deepEqual(await listStoredCaptures(dir), []);
     await assert.rejects(access(capture.screenshotPath!));
+  });
+});
+
+test("local capture store hydrates legacy screenshot file urls for renderer thumbnails", async () => {
+  await withTempStore(async (dir) => {
+    const storeDir = join(dir, "capture-store");
+    const screenshotDir = join(storeDir, "screenshots");
+    const screenshotPath = join(screenshotDir, "legacy.svg");
+    await mkdir(screenshotDir, { recursive: true });
+    await writeFile(screenshotPath, '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"></svg>', "utf8");
+    await writeFile(
+      join(storeDir, "captures.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          captures: [
+            {
+              id: "legacy",
+              workspaceId: "ws-1",
+              kind: "screenshot",
+              title: "Legacy screenshot",
+              url: "https://example.com/",
+              sourceType: "other",
+              screenshotDataUrl: `file://${screenshotPath.replace(/\\/g, "/")}`,
+              screenshotPath,
+              savedAt: "2026-05-29T00:00:00.000Z"
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const captures = await listStoredCaptures(dir);
+    assert.equal(captures.length, 1);
+    assert.match(captures[0].screenshotDataUrl ?? "", /^data:image\/svg\+xml;base64,/);
   });
 });

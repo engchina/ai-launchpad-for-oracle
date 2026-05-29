@@ -1,15 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import {
-  defaultOracleVectorSearchConfig,
-  normalizeOracleVectorSearchConfig,
-  type OracleVectorSearchConfig,
-  type RagChunk
-} from "../../../shared/rag";
+import type { RagChunk } from "../../../shared/rag";
 import type { CapturedPage } from "@renderer/data/mockData";
 import { defaultUrl, detectSourceType, mockPlaybooks, mockWorkspaces, titleForUrl } from "@renderer/data/mockData";
-
-type AssistantMode = "idle" | "summary" | "checklist" | "selection" | "ask";
 
 type LaunchpadState = {
   currentUrl: string;
@@ -19,21 +12,8 @@ type LaunchpadState = {
   captures: CapturedPage[];
   knowledgeCaptureIds: string[];
   knowledgeDocumentChunks: RagChunk[];
-  oracleVectorSearchConfig: OracleVectorSearchConfig;
-  summary: string;
-  checklist: string[];
-  selectionExplanation: string;
-  askPageAnswer: string;
-  askPageSources: Array<{ title: string; url: string }>;
-  assistantMode: AssistantMode;
   setUrl: (url: string) => void;
   setPageMetadata: (url: string, title: string) => void;
-  setWorkspace: (workspaceId: string) => void;
-  setPlaybook: (playbookId: string) => void;
-  summarizePage: () => void;
-  extractChecklist: () => void;
-  explainSelection: (selectedText?: string) => void;
-  setAskPageAnswer: (answer: string, sources: Array<{ title: string; url: string }>) => void;
   hydrateCaptures: (captures: CapturedPage[]) => void;
   addCapture: (capture: CapturedPage) => void;
   clearCaptures: () => void;
@@ -42,8 +22,6 @@ type LaunchpadState = {
   removeCaptureFromKnowledge: (captureId: string) => void;
   addKnowledgeDocumentChunks: (chunks: RagChunk[]) => void;
   removeKnowledgeDocument: (documentId: string) => void;
-  setOracleVectorSearchConfig: (patch: Partial<OracleVectorSearchConfig>) => void;
-  resetOracleVectorSearchConfig: () => void;
   clearKnowledge: () => void;
 };
 
@@ -59,62 +37,15 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       captures: [],
       knowledgeCaptureIds: [],
       knowledgeDocumentChunks: [],
-      oracleVectorSearchConfig: defaultOracleVectorSearchConfig,
-      summary: "",
-      checklist: [],
-      selectionExplanation: "",
-      askPageAnswer: "",
-      askPageSources: [],
-      assistantMode: "idle",
       setUrl: (url) =>
         set({
           currentUrl: url,
-          currentTitle: titleForUrl(url),
-          summary: "",
-          checklist: [],
-          selectionExplanation: "",
-          askPageAnswer: "",
-          askPageSources: [],
-          assistantMode: "idle"
+          currentTitle: titleForUrl(url)
         }),
       setPageMetadata: (url, title) =>
         set({
           currentUrl: url,
           currentTitle: title.trim() || titleForUrl(url)
-        }),
-      setWorkspace: (workspaceId) => set({ selectedWorkspaceId: workspaceId }),
-      setPlaybook: (playbookId) => set({ selectedPlaybookId: playbookId }),
-      summarizePage: () => {
-        const { currentTitle } = get();
-        set({
-          assistantMode: "summary",
-          summary: `${currentTitle} は、Oracle AI Database / OCI AI サービスの提案準備に使える技術情報です。MVP ではページ本文の取得は mock ですが、要約、前提条件、顧客向け説明、PoC checklist へ変換する流れを確認できます。`
-        });
-      },
-      extractChecklist: () => {
-        const playbook = mockPlaybooks.find((item) => item.id === get().selectedPlaybookId) ?? mockPlaybooks[0];
-        set({
-          assistantMode: "checklist",
-          checklist: [
-            "現在のページ URL と顧客 workspace の関連付けを確認する",
-            "提案対象の Oracle サービスと前提条件を整理する",
-            ...playbook.demoSteps,
-            "保存済み capture から follow-up と PoC package を生成する"
-          ]
-        });
-      },
-      explainSelection: (selectedText) =>
-        set({
-          assistantMode: "selection",
-          selectionExplanation: selectedText?.trim()
-            ? `選択テキストを顧客説明向けに整理します: ${selectedText.trim()}`
-            : "選択テキストが取得できませんでした。Electron 実行時は実ページ内でテキストを選択してから実行してください。"
-        }),
-      setAskPageAnswer: (answer, sources) =>
-        set({
-          assistantMode: "ask",
-          askPageAnswer: answer,
-          askPageSources: sources
         }),
       hydrateCaptures: (captures) =>
         set({
@@ -160,17 +91,6 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         set((state) => ({
           knowledgeDocumentChunks: state.knowledgeDocumentChunks.filter((chunk) => chunk.captureId !== documentId)
         })),
-      setOracleVectorSearchConfig: (patch) =>
-        set((state) => ({
-          oracleVectorSearchConfig: normalizeOracleVectorSearchConfig({
-            ...state.oracleVectorSearchConfig,
-            ...patch
-          })
-        })),
-      resetOracleVectorSearchConfig: () =>
-        set({
-          oracleVectorSearchConfig: defaultOracleVectorSearchConfig
-        }),
       clearKnowledge: () => set({ knowledgeCaptureIds: [], knowledgeDocumentChunks: [] })
     }),
     {
@@ -183,8 +103,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         selectedWorkspaceId: state.selectedWorkspaceId,
         selectedPlaybookId: state.selectedPlaybookId,
         knowledgeCaptureIds: state.knowledgeCaptureIds,
-        knowledgeDocumentChunks: state.knowledgeDocumentChunks,
-        oracleVectorSearchConfig: state.oracleVectorSearchConfig
+        knowledgeDocumentChunks: state.knowledgeDocumentChunks
       })
     }
   )

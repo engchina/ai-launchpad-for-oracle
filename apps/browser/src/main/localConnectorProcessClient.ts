@@ -2,15 +2,9 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { utilityProcess, type UtilityProcess } from "electron";
 import type {
-  AdbWalletCheckResult,
   GeneratePocAssetsPayload,
   GeneratePocAssetsResult,
   LocalConnectorHealth,
-  ObjectStorageCheckResult,
-  OciCheckConfigResult,
-  OracleVectorSearchExecutionPayload,
-  OracleVectorSearchExecutionResult,
-  SqlclCheckResult
 } from "../shared/api";
 import type {
   LocalConnectorRequestFor,
@@ -36,28 +30,8 @@ export class LocalConnectorProcessClient {
     return this.request("health", undefined);
   }
 
-  ociCheckConfig(): Promise<OciCheckConfigResult> {
-    return this.request("ociCheckConfig", undefined);
-  }
-
-  sqlclCheck(): Promise<SqlclCheckResult> {
-    return this.request("sqlclCheck", undefined);
-  }
-
-  adbWalletCheck(): Promise<AdbWalletCheckResult> {
-    return this.request("adbWalletCheck", undefined);
-  }
-
-  objectStorageCheck(): Promise<ObjectStorageCheckResult> {
-    return this.request("objectStorageCheck", undefined);
-  }
-
   generatePocAssets(payload: GeneratePocAssetsPayload): Promise<GeneratePocAssetsResult> {
     return this.request("generatePocAssets", payload);
-  }
-
-  oracleVectorSearch(payload: OracleVectorSearchExecutionPayload): Promise<OracleVectorSearchExecutionResult> {
-    return this.request("oracleVectorSearch", payload);
   }
 
   dispose(): void {

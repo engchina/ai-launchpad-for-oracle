@@ -1,11 +1,10 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type {
   AiLaunchpadApi,
-  AskPagePayload,
   BrowserViewCommand,
   CapturedPagePayload,
   GeneratePocAssetsPayload,
-  OracleVectorSearchExecutionPayload,
+  SaveOciGenAiSettingsPayload,
   RagAskPayload,
   SaveScreenshotPayload,
   SaveSelectionPayload
@@ -29,8 +28,7 @@ const api: AiLaunchpadApi = {
     savePage: (payload: CapturedPagePayload) => ipcRenderer.invoke("browser:save-page", payload),
     saveSelection: (payload: SaveSelectionPayload) => ipcRenderer.invoke("browser:save-selection", payload),
     saveScreenshot: (payload: SaveScreenshotPayload) => ipcRenderer.invoke("browser:save-screenshot", payload),
-    clearCaptures: () => ipcRenderer.invoke("browser:clear-captures"),
-    askPage: (payload: AskPagePayload) => ipcRenderer.invoke("browser:ask-page", payload)
+    clearCaptures: () => ipcRenderer.invoke("browser:clear-captures")
   },
   ragAdapter: {
     askKnowledge: (payload: RagAskPayload) => ipcRenderer.invoke("rag:ask-knowledge", payload)
@@ -42,13 +40,13 @@ const api: AiLaunchpadApi = {
   },
   localConnector: {
     health: () => ipcRenderer.invoke("local-connector:health"),
-    ociCheckConfig: () => ipcRenderer.invoke("local-connector:oci-check-config"),
-    sqlclCheck: () => ipcRenderer.invoke("local-connector:sqlcl-check"),
-    adbWalletCheck: () => ipcRenderer.invoke("local-connector:adb-wallet-check"),
-    objectStorageCheck: () => ipcRenderer.invoke("local-connector:object-storage-check"),
-    generatePocAssets: (payload: GeneratePocAssetsPayload) => ipcRenderer.invoke("local-connector:generate-poc-assets", payload),
-    oracleVectorSearch: (payload: OracleVectorSearchExecutionPayload) =>
-      ipcRenderer.invoke("local-connector:oracle-vector-search", payload)
+    generatePocAssets: (payload: GeneratePocAssetsPayload) => ipcRenderer.invoke("local-connector:generate-poc-assets", payload)
+  },
+  ociGenAiSettings: {
+    load: () => ipcRenderer.invoke("oci-genai-settings:load"),
+    save: (payload: SaveOciGenAiSettingsPayload) => ipcRenderer.invoke("oci-genai-settings:save", payload),
+    test: () => ipcRenderer.invoke("oci-genai-settings:test"),
+    clearApiKey: () => ipcRenderer.invoke("oci-genai-settings:clear-api-key")
   }
 };
 

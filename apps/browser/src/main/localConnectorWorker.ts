@@ -1,17 +1,5 @@
-import type {
-  GeneratePocAssetsPayload,
-  LocalConnectorHealth,
-  OracleVectorSearchExecutionPayload,
-  OracleVectorSearchExecutionResult
-} from "../shared/api";
-import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
-import { checkAdbWallet } from "./adbWalletProbe";
-import { checkObjectStorage } from "./objectStorageProbe";
-import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
+import type { GeneratePocAssetsPayload, LocalConnectorHealth } from "../shared/api";
 import { generatePocAssets } from "./pocAssetGenerator";
-import { createOracleVectorSearchReadinessChecks } from "./oracleVectorSearchReadiness";
-import { executeLiveOracleVectorSearch } from "./oracleVectorSearchExecutor";
-import { checkSqlcl } from "./sqlclProbe";
 import type {
   LocalConnectorRequest,
   LocalConnectorRequestType,
@@ -34,46 +22,7 @@ function createHealth(): LocalConnectorHealth {
     status: "mock-ready",
     connector: "local-connector",
     mode: "not-connected",
-    message: "Local Connector worker process は起動済みです。OCI / Oracle DB adapter はまだ接続していません。"
-  };
-}
-
-async function executeOracleVectorSearchWithReadiness(
-  payload: OracleVectorSearchExecutionPayload
-): Promise<OracleVectorSearchExecutionResult> {
-  const execution = executeOracleVectorSearchDryRun(payload);
-
-  if (execution.status !== "dry_run") {
-    return execution;
-  }
-
-  const [ociConfig, sqlcl, adbWallet] = await Promise.all([probeOciConfig(), checkSqlcl(), checkAdbWallet()]);
-  const readinessChecks = createOracleVectorSearchReadinessChecks(ociConfig, sqlcl, adbWallet);
-
-  // plan が valid な場合のみ live 実行を試みる。credential / driver 未整備なら dry-run に fallback する。
-  if (execution.plan) {
-    const live = await executeLiveOracleVectorSearch(execution.plan, payload.question, process.env);
-    if (live.ok) {
-      return {
-        ...execution,
-        status: "executed",
-        message: "Oracle Vector Search を Oracle AI Database に対して実行しました。",
-        rows: live.rows,
-        readinessChecks,
-        executedAt: new Date().toISOString()
-      };
-    }
-
-    return {
-      ...execution,
-      readinessChecks,
-      validationErrors: [...(execution.validationErrors ?? []), `live 実行は fallback しました: ${live.reason}`]
-    };
-  }
-
-  return {
-    ...execution,
-    readinessChecks
+    message: "Local Connector worker process は起動済みです。OCI GenAI Enterprise AI package 生成のみを扱います。"
   };
 }
 
@@ -84,30 +33,8 @@ async function handleRequest<T extends LocalConnectorRequestType>(
     return createHealth() as LocalConnectorResponsePayloadByType[T];
   }
 
-  if (request.type === "ociCheckConfig") {
-    return (await probeOciConfig()) as LocalConnectorResponsePayloadByType[T];
-  }
-
-  if (request.type === "sqlclCheck") {
-    return (await checkSqlcl()) as LocalConnectorResponsePayloadByType[T];
-  }
-
-  if (request.type === "adbWalletCheck") {
-    return (await checkAdbWallet()) as LocalConnectorResponsePayloadByType[T];
-  }
-
-  if (request.type === "objectStorageCheck") {
-    return checkObjectStorage() as LocalConnectorResponsePayloadByType[T];
-  }
-
   if (request.type === "generatePocAssets" && request.payload) {
     return generatePocAssets(request.payload as GeneratePocAssetsPayload) as LocalConnectorResponsePayloadByType[T];
-  }
-
-  if (request.type === "oracleVectorSearch" && request.payload) {
-    return (await executeOracleVectorSearchWithReadiness(
-      request.payload as OracleVectorSearchExecutionPayload
-    )) as LocalConnectorResponsePayloadByType[T];
   }
 
   throw new Error(`Unsupported Local Connector request: ${String(request.type)}`);

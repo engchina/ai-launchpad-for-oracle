@@ -3,8 +3,6 @@ import {
   answerRagQuestion,
   searchRagChunks,
   truncateRagText,
-  type OracleVectorSearchConfig,
-  type RagAdapterId,
   type RagAskResult,
   type RagChunk,
   type RagSearchResult
@@ -54,9 +52,7 @@ export function searchKnowledge(question: string, chunks: KnowledgeChunk[], maxR
 export function answerKnowledgeQuestion(
   question: string,
   chunks: KnowledgeChunk[],
-  maxResults = 3,
-  adapter: RagAdapterId = "local-keyword",
-  oracleVectorSearch?: OracleVectorSearchConfig
+  maxResults = 3
 ): GroundedKnowledgeAnswer {
-  return answerRagQuestion({ question, chunks, maxResults, adapter, oracleVectorSearch });
+  return answerRagQuestion({ question, chunks, maxResults });
 }

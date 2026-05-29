@@ -1,4 +1,3 @@
-import type { OracleVectorSearchExecutionResult } from "../../../shared/oracleVectorSearch";
 import type { RagSearchResult } from "../../../shared/rag";
 
 type FormatKnowledgeAnswerMarkdownInput = {
@@ -8,7 +7,6 @@ type FormatKnowledgeAnswerMarkdownInput = {
   answer: string;
   adapterStatus: string;
   sources: RagSearchResult[];
-  oracleVectorExecution: OracleVectorSearchExecutionResult | null;
 };
 
 function normalizeFileNameSegment(value: string, fallback: string): string {
@@ -32,13 +30,6 @@ export function createKnowledgeAnswerFileName(workspaceName: string, generatedAt
   return `${safeWorkspaceName}-grounded-answer-${safeDate}.md`;
 }
 
-export function createOracleVectorSqlFileName(workspaceName: string, generatedAt: string): string {
-  const safeWorkspaceName = normalizeFileNameSegment(workspaceName, "oracle-vector");
-  const safeDate = generatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10);
-
-  return `${safeWorkspaceName}-oracle-vector-plan-${safeDate}.sql`;
-}
-
 function formatSources(sources: RagSearchResult[]): string[] {
   if (sources.length === 0) {
     return ["根拠 source はありません。"];
@@ -54,84 +45,6 @@ function formatSources(sources: RagSearchResult[]): string[] {
   ]);
 }
 
-function formatOracleVectorExecution(execution: OracleVectorSearchExecutionResult | null): string[] {
-  if (!execution) {
-    return [];
-  }
-
-  const lines = [
-    "## Oracle Vector Search",
-    "",
-    `- Status: ${execution.status}`,
-    `- Message: ${execution.message}`,
-    `- Executed at: ${execution.executedAt}`,
-    `- Latency: ${execution.latencyMs}ms`
-  ];
-
-  if (execution.validationErrors && execution.validationErrors.length > 0) {
-    lines.push("", "### Validation errors", "", ...execution.validationErrors.map((error) => `- ${error}`));
-  }
-
-  if (execution.readinessChecks && execution.readinessChecks.length > 0) {
-    const readinessLines = execution.readinessChecks.flatMap((check) => [
-      `- ${check.name}: ${check.status} - ${check.message}${check.path ? ` (${check.path})` : ""}`,
-      ...(check.checks ?? []).map(
-        (detail) => `  - ${detail.ok ? "ok" : "ng"} ${detail.name}: ${detail.message}`
-      )
-    ]);
-
-    lines.push(
-      "",
-      "### Execution readiness",
-      "",
-      ...readinessLines
-    );
-  }
-
-  if (execution.plan) {
-    lines.push(
-      "",
-      "### Dry-run plan",
-      "",
-      `- Connection: ${execution.plan.connectionName}`,
-      `- Table: ${execution.plan.tableName}`,
-      `- Vector column: ${execution.plan.vectorColumn}`,
-      `- Text column: ${execution.plan.textColumn}`,
-      `- Embedding model: ${execution.plan.embeddingModel}`,
-      `- Top K: ${execution.plan.topK}`,
-      "",
-      "```sql",
-      execution.plan.sqlPreview,
-      "```",
-      "",
-      "### SQLcl script preview",
-      "",
-      "```sql",
-      execution.plan.sqlclScriptPreview,
-      "```",
-      "",
-      "### Bind variables",
-      "",
-      ...execution.plan.bindVariables.map((bind) => `- \`${bind.name}\`: ${bind.purpose}`)
-    );
-  }
-
-  if (execution.rows && execution.rows.length > 0) {
-    lines.push(
-      "",
-      `### Vector Search results (${execution.rows.length})`,
-      "",
-      ...execution.rows.map((row, index) => {
-        const distanceLabel = typeof row.distance === "number" ? ` (distance ${row.distance.toFixed(4)})` : "";
-        const title = row.title ? `${row.title}: ` : "";
-        return `${index + 1}. ${title}${row.chunkText.replace(/\s+/g, " ").trim()}${distanceLabel}`;
-      })
-    );
-  }
-
-  return lines;
-}
-
 export function formatKnowledgeAnswerMarkdown(input: FormatKnowledgeAnswerMarkdownInput): string {
   const lines = [
     `# ${input.workspaceName} Grounded Answer`,
@@ -139,7 +52,7 @@ export function formatKnowledgeAnswerMarkdown(input: FormatKnowledgeAnswerMarkdo
     "## Context",
     "",
     `- Playbook: ${input.playbookTitle}`,
-    `- Adapter: ${input.adapterStatus || "unknown"}`,
+    `- Provider: ${input.adapterStatus || "unknown"}`,
     "",
     "## Question",
     "",
@@ -153,12 +66,6 @@ export function formatKnowledgeAnswerMarkdown(input: FormatKnowledgeAnswerMarkdo
     "",
     ...formatSources(input.sources)
   ];
-
-  const oracleVectorLines = formatOracleVectorExecution(input.oracleVectorExecution);
-
-  if (oracleVectorLines.length > 0) {
-    lines.push("", ...oracleVectorLines);
-  }
 
   return lines.join("\n");
 }

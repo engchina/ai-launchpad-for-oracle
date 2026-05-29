@@ -315,7 +315,7 @@ function DocsMockPage(): ReactElement {
     <div className="grid min-h-[610px] flex-1 grid-cols-[220px_1fr] overflow-auto">
       <div className="border-r border-border bg-slate-50 p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Oracle Docs</p>
-        {["Overview", "Vector indexes", "Embedding models", "SQL examples", "Troubleshooting"].map((item, index) => (
+        {["Overview", "Models", "Enterprise AI", "Prompt grounding", "Troubleshooting"].map((item, index) => (
           <div
             key={item}
             className={cn(
@@ -329,8 +329,8 @@ function DocsMockPage(): ReactElement {
       </div>
       <div className="p-8">
         <div className="mb-6 max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Oracle AI Database 26ai</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-slate-950">AI Vector Search</h1>
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">OCI Generative AI</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-slate-950">Enterprise AI Assistant</h1>
           <p className="mt-4 text-base leading-7 text-slate-600">
             このページは Browser Client の fallback viewport です。Electron では実際の Web ページを表示します。
           </p>
@@ -338,9 +338,9 @@ function DocsMockPage(): ReactElement {
 
         <div className="grid grid-cols-3 gap-4">
           {[
-            ["Prerequisites", "Database version、権限、embedding model、vector index の確認"],
-            ["Demo Flow", "文書投入、embedding、検索、引用付き回答までの流れ"],
-            ["PoC Assets", "SQL、Python、README、検証 checklist への変換"]
+            ["Prerequisites", "Endpoint、model、API key、利用ポリシーの確認"],
+            ["Grounded Review", "保存した capture とページ情報をもとに、OCI GenAI の検討ポイントを整理"],
+            ["Next Actions", "確認事項、担当者、次回までの準備を短くまとめる"]
           ].map(([title, body]) => (
             <section key={title} className="rounded-md border border-border bg-slate-50 p-4">
               <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
@@ -352,7 +352,7 @@ function DocsMockPage(): ReactElement {
         <section className="mt-6 rounded-md border border-border">
           <div className="border-b border-border bg-slate-50 px-4 py-3 text-sm font-semibold">Example checklist</div>
           <div className="divide-y divide-border">
-            {["Create table with VECTOR column", "Load embeddings", "Create vector index", "Run similarity query"].map((item) => (
+            {["Confirm OCI GenAI endpoint", "Select model", "Review saved captures", "Draft grounded notes"].map((item) => (
               <div key={item} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700">
                 <CheckSquare aria-hidden="true" className="h-4 w-4 text-sky-700" />
                 {item}
@@ -371,7 +371,7 @@ function ConsoleMockPage(): ReactElement {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">OCI Console</p>
-          <h1 className="mt-2 text-2xl font-semibold">Generative AI / Agent readiness</h1>
+          <h1 className="mt-2 text-2xl font-semibold">Generative AI / Enterprise setup</h1>
         </div>
         <span className="rounded-md bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-200 ring-1 ring-emerald-400/30">
           Mock console
@@ -379,16 +379,16 @@ function ConsoleMockPage(): ReactElement {
       </div>
       <div className="grid grid-cols-[240px_1fr] gap-5">
         <div className="rounded-md border border-white/10 bg-white/5 p-4">
-          {["Overview", "Models", "Agents", "Object Storage", "Policies"].map((item, index) => (
+          {["Overview", "Models", "Endpoints", "Policies", "Usage"].map((item, index) => (
             <div key={item} className={cn("rounded-md px-3 py-2 text-sm", index === 2 ? "bg-white/10 text-white" : "text-slate-300")}>
               {item}
             </div>
           ))}
         </div>
         <div className="rounded-md border border-white/10 bg-white p-5 text-slate-950">
-          <h2 className="text-lg font-semibold">Agent setup checklist</h2>
+          <h2 className="text-lg font-semibold">Enterprise AI setup checklist</h2>
           <div className="mt-4 grid grid-cols-2 gap-4">
-            {["Compartment access", "Object Storage bucket", "IAM policy", "Endpoint validation"].map((item) => (
+            {["Endpoint validation", "Model access", "API key owner", "Prompt context review"].map((item) => (
               <div key={item} className="rounded-md border border-border p-4">
                 <p className="text-sm font-medium">{item}</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">AI Sidebar で不足条件と説明文を生成します。</p>

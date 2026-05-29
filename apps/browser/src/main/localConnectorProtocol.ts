@@ -1,33 +1,17 @@
 import type {
-  AdbWalletCheckResult,
   LocalConnectorHealth,
   GeneratePocAssetsPayload,
   GeneratePocAssetsResult,
-  ObjectStorageCheckResult,
-  OciCheckConfigResult,
-  OracleVectorSearchExecutionPayload,
-  OracleVectorSearchExecutionResult,
-  SqlclCheckResult
 } from "../shared/api";
 
 export type LocalConnectorRequestPayloadByType = {
   health: undefined;
-  ociCheckConfig: undefined;
-  sqlclCheck: undefined;
-  adbWalletCheck: undefined;
-  objectStorageCheck: undefined;
   generatePocAssets: GeneratePocAssetsPayload;
-  oracleVectorSearch: OracleVectorSearchExecutionPayload;
 };
 
 export type LocalConnectorResponsePayloadByType = {
   health: LocalConnectorHealth;
-  ociCheckConfig: OciCheckConfigResult;
-  sqlclCheck: SqlclCheckResult;
-  adbWalletCheck: AdbWalletCheckResult;
-  objectStorageCheck: ObjectStorageCheckResult;
   generatePocAssets: GeneratePocAssetsResult;
-  oracleVectorSearch: OracleVectorSearchExecutionResult;
 };
 
 export type LocalConnectorRequestType = keyof LocalConnectorRequestPayloadByType;

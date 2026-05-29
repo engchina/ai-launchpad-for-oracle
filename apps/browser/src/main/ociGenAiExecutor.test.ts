@@ -4,7 +4,9 @@ import {
   OCI_GENAI_LIVE_ENV_FLAG,
   buildGenAiMessages,
   generateOciGenAiAnswer,
-  resolveOciGenAiReadiness
+  resolveOciGenAiReadiness,
+  resolveOciGenAiReadinessFromSettings,
+  testOciGenAiConnection
 } from "./ociGenAiExecutor";
 
 test("resolveOciGenAiReadiness は flag 未設定なら disabled", () => {
@@ -36,16 +38,53 @@ test("resolveOciGenAiReadiness は全設定が揃うと enabled", () => {
   }
 });
 
+test("resolveOciGenAiReadinessFromSettings は保存済み settings を env より優先する", () => {
+  const readiness = resolveOciGenAiReadinessFromSettings(
+    {},
+    {
+      enabled: true,
+      baseUrl: "https://inference.example/v1",
+      apiKey: "sk-settings",
+      model: "cohere.command-r-plus",
+      project: "ocid1.generativeaiproject.oc1.example"
+    }
+  );
+  assert.equal(readiness.enabled, true);
+  if (readiness.enabled) {
+    assert.equal(readiness.config.apiKey, "sk-settings");
+    assert.equal(readiness.config.model, "cohere.command-r-plus");
+    assert.equal(readiness.config.project, "ocid1.generativeaiproject.oc1.example");
+  }
+});
+
+test("resolveOciGenAiReadinessFromSettings は settings の不足項目を返す", () => {
+  const readiness = resolveOciGenAiReadinessFromSettings(
+    {},
+    {
+      enabled: true,
+      baseUrl: "",
+      apiKey: "",
+      model: "cohere.command-r",
+      project: ""
+    }
+  );
+  assert.deepEqual(readiness, {
+    enabled: false,
+    reason: "incomplete",
+    missing: ["OCI GenAI Base URL", "OCI GenAI API key"]
+  });
+});
+
 test("buildGenAiMessages は system + 根拠つき user message を生成", () => {
-  const messages = buildGenAiMessages("Oracle Vector Search とは", [
-    { title: "Vector 概要", sourceUrl: "https://docs.example", text: "VECTOR_DISTANCE で近傍検索する。" }
+  const messages = buildGenAiMessages("OCI GenAI Enterprise AI の確認事項は?", [
+    { title: "GenAI 概要", sourceUrl: "https://docs.example", text: "endpoint、model、API key owner を確認する。" }
   ]);
   assert.equal(messages.length, 2);
   assert.equal(messages[0].role, "system");
   assert.equal(messages[1].role, "user");
   assert.match(messages[1].content, /# 質問/);
-  assert.match(messages[1].content, /Vector 概要/);
-  assert.match(messages[1].content, /VECTOR_DISTANCE/);
+  assert.match(messages[1].content, /GenAI 概要/);
+  assert.match(messages[1].content, /API key owner/);
 });
 
 test("buildGenAiMessages は根拠なしでもプレースホルダを入れる", () => {
@@ -59,4 +98,79 @@ test("generateOciGenAiAnswer は無効時に fallback 理由を返す", async ()
   if (!generation.ok) {
     assert.match(generation.reason, new RegExp(OCI_GENAI_LIVE_ENV_FLAG));
   }
+});
+
+test("generateOciGenAiAnswer は Project がある場合 OpenAI-Project header を送る", async () => {
+  const originalFetch = globalThis.fetch;
+  let projectHeader = "";
+  let requestedUrl = "";
+
+  globalThis.fetch = (async (input, init) => {
+    requestedUrl = String(input);
+    const headers = init?.headers as Record<string, string>;
+    projectHeader = headers["OpenAI-Project"] ?? "";
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: "回答" } }]
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      }
+    );
+  }) as typeof fetch;
+
+  try {
+    const generation = await generateOciGenAiAnswer(
+      "質問",
+      [{ text: "根拠" }],
+      {},
+      {
+        enabled: true,
+        baseUrl: "https://inference.example/v1/",
+        apiKey: "sk-settings",
+        model: "cohere.command-r-plus",
+        project: "ocid1.generativeaiproject.oc1.example"
+      }
+    );
+
+    assert.deepEqual(generation, { ok: true, answer: "回答" });
+    assert.equal(requestedUrl, "https://inference.example/v1/chat/completions");
+    assert.equal(projectHeader, "ocid1.generativeaiproject.oc1.example");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("testOciGenAiConnection は最小 chat completion で接続を確認する", async () => {
+  let requestedUrl = "";
+  let requestBody = "";
+
+  const fetchImpl = (async (input, init) => {
+    requestedUrl = String(input);
+    requestBody = String(init?.body ?? "");
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: "OK" } }]
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      }
+    );
+  }) as typeof fetch;
+
+  const result = await testOciGenAiConnection(
+    {
+      baseUrl: "https://inference.example/v1/",
+      apiKey: "sk-settings",
+      model: "cohere.command-r-plus",
+      project: ""
+    },
+    fetchImpl
+  );
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal(requestedUrl, "https://inference.example/v1/chat/completions");
+  assert.match(requestBody, /"max_tokens":16/);
 });

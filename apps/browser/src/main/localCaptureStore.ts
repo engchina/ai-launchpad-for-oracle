@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, extname, join } from "node:path";
 import type {
   CapturedPagePayload,
   CapturedPageRecord,
@@ -27,8 +27,21 @@ function getScreenshotDir(baseDir: string): string {
   return join(getStoreDir(baseDir), "screenshots");
 }
 
-function toFileUrl(filePath: string): string {
-  return `file://${filePath.replace(/\\/g, "/")}`;
+function mimeTypeForScreenshotPath(filePath: string): string {
+  const extension = extname(filePath).toLowerCase();
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+
+  if (extension === ".svg") {
+    return "image/svg+xml";
+  }
+
+  return "image/png";
 }
 
 async function readStore(baseDir: string): Promise<CaptureStoreFile> {
@@ -125,7 +138,7 @@ async function writeScreenshot(baseDir: string, captureId: string, dataUrl?: str
   await writeFile(screenshotPath, imageBuffer);
   return {
     path: screenshotPath,
-    url: toFileUrl(screenshotPath)
+    url: dataUrl
   };
 }
 
@@ -139,8 +152,25 @@ async function upsertCapture(baseDir: string, capture: CapturedPageRecord): Prom
   return capture;
 }
 
+async function hydrateScreenshotDataUrl(capture: CapturedPageRecord): Promise<CapturedPageRecord> {
+  if (capture.kind !== "screenshot" || !capture.screenshotPath || capture.screenshotDataUrl?.startsWith("data:")) {
+    return capture;
+  }
+
+  try {
+    const imageBuffer = await readFile(capture.screenshotPath);
+    return {
+      ...capture,
+      screenshotDataUrl: `data:${mimeTypeForScreenshotPath(capture.screenshotPath)};base64,${imageBuffer.toString("base64")}`
+    };
+  } catch {
+    return capture;
+  }
+}
+
 export async function listStoredCaptures(baseDir: string): Promise<CapturedPageRecord[]> {
-  return (await readStore(baseDir)).captures;
+  const store = await readStore(baseDir);
+  return Promise.all(store.captures.map((capture) => hydrateScreenshotDataUrl(capture)));
 }
 
 export async function savePageCapture(baseDir: string, payload: CapturedPagePayload): Promise<CapturedPageRecord> {

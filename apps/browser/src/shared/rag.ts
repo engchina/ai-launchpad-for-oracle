@@ -1,31 +1,6 @@
-import {
-  defaultOracleVectorSearchConfig,
-  executeOracleVectorSearchDryRun,
-  normalizeOracleVectorSearchConfig,
-  type OracleVectorSearchConfig,
-  type OracleVectorSearchExecutionResult
-} from "./oracleVectorSearch";
-
 export type RagSourceKind = "page" | "selection" | "screenshot" | "document";
-export type RagAdapterId = "local-keyword" | "oracle-vector-search";
-export type RagAdapterStatus = "ready" | "not_configured" | "invalid_config" | "dry_run" | "unavailable";
-
-export type { OracleVectorSearchConfig, OracleVectorSearchExecutionResult, OracleVectorSearchPlan } from "./oracleVectorSearch";
-export {
-  createOracleVectorSearchPlan,
-  defaultOracleVectorSearchConfig,
-  executeOracleVectorSearchDryRun,
-  getMissingOracleVectorSearchConfigFields,
-  isOracleVectorSearchConfigured,
-  normalizeOracleVectorSearchConfig
-} from "./oracleVectorSearch";
-
-export type RagAdapterHealth = {
-  adapter: RagAdapterId;
-  status: RagAdapterStatus;
-  message: string;
-  config?: OracleVectorSearchConfig;
-};
+export type RagAdapterId = "oci-genai-enterprise-ai";
+export type RagAdapterStatus = "ready" | "unavailable";
 
 export type RagChunk = {
   id: string;
@@ -47,23 +22,20 @@ export type RagAskPayload = {
   question: string;
   chunks: RagChunk[];
   maxResults?: number;
-  adapter?: RagAdapterId;
-  oracleVectorSearch?: OracleVectorSearchConfig;
 };
 
 export type RagAskResult = {
   question: string;
   answer: string;
   results: RagSearchResult[];
-  status: "empty" | "no_match" | "answered" | "adapter_unavailable" | "adapter_dry_run";
+  status: "empty" | "no_match" | "answered" | "adapter_unavailable";
   adapter: RagAdapterId;
   adapterStatus?: RagAdapterStatus;
-  oracleVectorSearch?: OracleVectorSearchExecutionResult;
   answerProvider?: "deterministic" | "oci-genai";
   latencyMs?: number;
 };
 
-const defaultKnowledgeQuestion = "現在の knowledge set から PoC に使える要点を整理してください。";
+const defaultKnowledgeQuestion = "現在の captures から OCI GenAI Enterprise AI の検討ポイントを整理してください。";
 
 const stopWords = new Set([
   "the",
@@ -198,110 +170,17 @@ export function searchRagChunks(question: string, chunks: RagChunk[], maxResults
     .slice(0, maxResults);
 }
 
-export function getRagAdapterHealth(adapter: RagAdapterId, config?: OracleVectorSearchConfig): RagAdapterHealth {
-  if (adapter === "local-keyword") {
-    return {
-      adapter,
-      status: "ready",
-      message: "Local keyword retrieval is ready."
-    };
-  }
-
-  const effectiveConfig = normalizeOracleVectorSearchConfig(config);
-  if (!effectiveConfig.configured) {
-    return {
-      adapter,
-      status: "not_configured",
-      message:
-        "Oracle Vector Search adapter はまだ設定されていません。次フェーズで connection、table、vector column、embedding model を接続します。",
-      config: effectiveConfig
-    };
-  }
-
-  return {
-    adapter,
-    status: "dry_run",
-    message: "Oracle Vector Search adapter の dry-run 契約は定義済みです。実 DB 呼び出しはまだ実装していません。",
-    config: effectiveConfig
-  };
-}
-
-export function createOracleVectorSearchRagAnswer(
-  payload: RagAskPayload,
-  execution: OracleVectorSearchExecutionResult,
-  latencyMs?: number
-): RagAskResult {
-  const normalizedQuestion = normalizeRagQuestion(payload.question);
-
-  if (execution.status === "executed") {
-    const rows = execution.rows ?? [];
-    const sourceSummary = rows
-      .map((row, index) => {
-        const distanceLabel = typeof row.distance === "number" ? `, distance ${row.distance.toFixed(4)}` : "";
-        return `#${index + 1} ${row.title ?? row.chunkText.slice(0, 40)}${distanceLabel}`;
-      })
-      .join(" / ");
-
-    return {
-      question: normalizedQuestion,
-      answer:
-        rows.length > 0
-          ? `${execution.message} 質問「${normalizedQuestion}」に対し、Oracle AI Vector Search が ${rows.length} 件の根拠を返しました: ${sourceSummary}`
-          : `${execution.message} 一致する vector 近傍は見つかりませんでした。`,
-      results: [],
-      status: "answered",
-      adapter: "oracle-vector-search",
-      adapterStatus: "ready",
-      oracleVectorSearch: execution,
-      latencyMs
-    };
-  }
-
-  const adapterStatus =
-    execution.status === "dry_run"
-      ? "dry_run"
-      : execution.status === "invalid_config"
-        ? "invalid_config"
-        : execution.status === "not_configured"
-          ? "not_configured"
-          : "unavailable";
-
-  return {
-    question: normalizedQuestion,
-    answer:
-      execution.status === "dry_run"
-        ? `${execution.message} SQL preview と bind contract を確認してください。`
-        : `${execution.message} ${execution.validationErrors?.join(" ") ?? ""}`.trim(),
-    results: [],
-    status: execution.status === "dry_run" ? "adapter_dry_run" : "adapter_unavailable",
-    adapter: "oracle-vector-search",
-    adapterStatus,
-    oracleVectorSearch: execution,
-    latencyMs
-  };
-}
-
-function answerOracleVectorSearchQuestion(payload: RagAskPayload, startedAt: number): RagAskResult {
-  const normalizedQuestion = normalizeRagQuestion(payload.question);
-  const execution = executeOracleVectorSearchDryRun({
-    question: normalizedQuestion,
-    config: payload.oracleVectorSearch ?? defaultOracleVectorSearchConfig,
-    maxResults: payload.maxResults
-  });
-
-  return createOracleVectorSearchRagAnswer(payload, execution, Math.round(performance.now() - startedAt));
-}
-
-function answerLocalKeywordQuestion(payload: RagAskPayload, startedAt: number): RagAskResult {
+export function answerRagQuestion(payload: RagAskPayload): RagAskResult {
+  const startedAt = performance.now();
   const normalizedQuestion = normalizeRagQuestion(payload.question);
 
   if (payload.chunks.length === 0) {
     return {
       question: normalizedQuestion,
-      answer: "Knowledge set が空です。まず captures を knowledge に追加してください。",
+      answer: "Capture context が空です。まずページ、選択テキスト、またはスクリーンショットを Captures に保存してください。",
       results: [],
       status: "empty",
-      adapter: "local-keyword",
+      adapter: "oci-genai-enterprise-ai",
       adapterStatus: "ready",
       latencyMs: Math.round(performance.now() - startedAt)
     };
@@ -313,10 +192,10 @@ function answerLocalKeywordQuestion(payload: RagAskPayload, startedAt: number): 
     return {
       question: normalizedQuestion,
       answer:
-        `質問「${normalizedQuestion}」に一致する根拠は、現在の knowledge set からは見つかりませんでした。capture を追加するか、より具体的な Oracle service / demo step / URL キーワードで再検索してください。`,
+        `質問「${normalizedQuestion}」に対して OCI GenAI Enterprise AI へ渡せる根拠は、現在の captures からは見つかりませんでした。capture を追加するか、より具体的な Oracle service / demo step / URL キーワードで再検索してください。`,
       results: [],
       status: "no_match",
-      adapter: "local-keyword",
+      adapter: "oci-genai-enterprise-ai",
       adapterStatus: "ready",
       latencyMs: Math.round(performance.now() - startedAt)
     };
@@ -329,22 +208,11 @@ function answerLocalKeywordQuestion(payload: RagAskPayload, startedAt: number): 
   return {
     question: normalizedQuestion,
     answer:
-      `質問「${normalizedQuestion}」に対して、現在の local retrieval では ${sourceSummary} を根拠として使えます。回答本文はまだ生成 AI ではなく deterministic summary ですが、source selection は keyword score に基づく実検索結果です。次フェーズでは同じ interface を embedding / Oracle AI Vector Search adapter に差し替えます。`,
+      `質問「${normalizedQuestion}」に対して、OCI GenAI Enterprise AI の回答生成に使う根拠候補として ${sourceSummary} を選択しました。`,
     results,
     status: "answered",
-    adapter: "local-keyword",
+    adapter: "oci-genai-enterprise-ai",
     adapterStatus: "ready",
     latencyMs: Math.round(performance.now() - startedAt)
   };
-}
-
-export function answerRagQuestion(payload: RagAskPayload): RagAskResult {
-  const startedAt = performance.now();
-  const adapter = payload.adapter ?? "local-keyword";
-
-  if (adapter === "oracle-vector-search") {
-    return answerOracleVectorSearchQuestion(payload, startedAt);
-  }
-
-  return answerLocalKeywordQuestion(payload, startedAt);
 }

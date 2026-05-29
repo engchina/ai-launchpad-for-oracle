@@ -1,6 +1,4 @@
 import type {
-  AskPagePayload,
-  AskPageResult,
   CapturedPagePayload,
   CapturedPageRecord,
   CapturedPageResult,
@@ -57,15 +55,4 @@ export class BrowserWorkspaceService {
     };
   }
 
-  askPage(payload: AskPagePayload): AskPageResult {
-    return {
-      answer: `${payload.title} の内容を、現在のワークスペース向けに要約しました。Oracle AI Database、OCI Generative AI、PoC 準備に関係する前提条件と手順を優先して確認してください。`,
-      sources: [
-        {
-          title: payload.title,
-          url: payload.url
-        }
-      ]
-    };
-  }
 }
