@@ -43,6 +43,7 @@ mac:
 linux:
   artifactName: AI.Launchpad.for.Oracle_${version}_${arch}.${ext}
   icon: src/renderer/public/app-icon.png
+  maintainer: engchina <atjapan2015@gmail.com>
   target:
     - target: AppImage
       arch:

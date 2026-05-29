@@ -1,8 +1,13 @@
 {
   "name": "@ai-launchpad/browser",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "AI Launchpad for Oracle Browser Client MVP",
+  "homepage": "https://github.com/engchina/ai-launchpad-for-oracle",
+  "author": {
+    "name": "engchina",
+    "email": "atjapan2015@gmail.com"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
