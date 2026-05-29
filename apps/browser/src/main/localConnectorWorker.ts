@@ -48,11 +48,11 @@ async function executeOracleVectorSearchWithReadiness(
     return execution;
   }
 
-  const [sqlcl, adbWallet] = await Promise.all([checkSqlcl(), checkAdbWallet()]);
+  const [ociConfig, sqlcl, adbWallet] = await Promise.all([probeOciConfig(), checkSqlcl(), checkAdbWallet()]);
 
   return {
     ...execution,
-    readinessChecks: createOracleVectorSearchReadinessChecks(sqlcl, adbWallet)
+    readinessChecks: createOracleVectorSearchReadinessChecks(ociConfig, sqlcl, adbWallet)
   };
 }
 

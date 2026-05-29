@@ -11,3 +11,4 @@ test-results/
 
 *.log
 *.tsbuildinfo
+node_modules

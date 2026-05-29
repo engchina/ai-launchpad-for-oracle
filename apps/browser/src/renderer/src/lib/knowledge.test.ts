@@ -183,3 +183,39 @@ test("Oracle Vector Search execution contract rejects unsafe identifiers", () =>
   assert.equal(result.plan, undefined);
   assert.match(result.validationErrors?.join(" ") ?? "", /Oracle identifier/);
 });
+
+test("Oracle Vector Search execution contract rejects unsafe SQLcl connection aliases", () => {
+  const result = executeOracleVectorSearchDryRun({
+    question: "vector index",
+    config: {
+      connectionName: "user/password@adb_high",
+      tableName: "AI_LAUNCHPAD_CHUNKS",
+      vectorColumn: "VECTOR_EMBEDDING",
+      textColumn: "CHUNK_TEXT",
+      embeddingModel: "cohere.embed-multilingual-v3.0",
+      topK: 5
+    }
+  });
+
+  assert.equal(result.status, "invalid_config");
+  assert.equal(result.plan, undefined);
+  assert.match(result.validationErrors?.join(" ") ?? "", /SQLcl connection alias/);
+});
+
+test("Oracle Vector Search SQLcl script preview keeps comment fields on one line", () => {
+  const result = executeOracleVectorSearchDryRun({
+    question: "vector index",
+    config: {
+      connectionName: "adb-sales-demo",
+      tableName: "SALES_AI.CUSTOMER_CHUNKS",
+      vectorColumn: "VECTOR_EMBEDDING",
+      textColumn: "CHUNK_TEXT",
+      embeddingModel: "cohere.embed\nmultilingual-v3.0",
+      topK: 5
+    }
+  });
+
+  assert.equal(result.status, "dry_run");
+  assert.match(result.plan?.sqlclScriptPreview ?? "", /Embedding model: cohere\.embed multilingual-v3\.0/);
+  assert.doesNotMatch(result.plan?.sqlclScriptPreview ?? "", /-- Embedding model: cohere\.embed\nmultilingual-v3\.0/);
+});

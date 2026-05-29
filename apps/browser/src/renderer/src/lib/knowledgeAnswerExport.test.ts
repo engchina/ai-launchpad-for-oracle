@@ -49,15 +49,42 @@ test("formatKnowledgeAnswerMarkdown includes answer sources and Oracle Vector pl
       executedAt: "2026-05-26T10:20:30.000Z",
       readinessChecks: [
         {
+          name: "OCI config",
+          status: "ready",
+          message: "OCI config と key_file を確認しました。",
+          path: "C:\\Users\\demo\\.oci\\config",
+          checks: [
+            {
+              name: "profile",
+              ok: true,
+              message: "profile [DEFAULT] を確認しました。"
+            }
+          ]
+        },
+        {
           name: "SQLcl",
           status: "ready",
           message: "SQLcl executable を確認しました。",
-          path: "C:\\oracle\\sqlcl\\bin\\sql.exe"
+          path: "C:\\oracle\\sqlcl\\bin\\sql.exe",
+          checks: [
+            {
+              name: "sqlcl_path",
+              ok: true,
+              message: "SQLCL_PATH の executable は読み取り可能です。"
+            }
+          ]
         },
         {
           name: "ADB wallet",
           status: "not-configured",
-          message: "ADB wallet path が未設定です。"
+          message: "ADB wallet path が未設定です。",
+          checks: [
+            {
+              name: "wallet_path",
+              ok: false,
+              message: "ADB wallet path が設定されていません。"
+            }
+          ]
         }
       ],
       plan: {
@@ -84,8 +111,12 @@ test("formatKnowledgeAnswerMarkdown includes answer sources and Oracle Vector pl
   assert.match(markdown, /Oracle AI Vector Search/);
   assert.match(markdown, /https:\/\/docs\.oracle\.com\/vector-search/);
   assert.match(markdown, /### Execution readiness/);
+  assert.match(markdown, /OCI config: ready - OCI config と key_file を確認しました。/);
+  assert.match(markdown, /ok profile: profile \[DEFAULT\] を確認しました。/);
   assert.match(markdown, /SQLcl: ready - SQLcl executable を確認しました。/);
+  assert.match(markdown, /ok sqlcl_path: SQLCL_PATH の executable は読み取り可能です。/);
   assert.match(markdown, /ADB wallet: not-configured - ADB wallet path が未設定です。/);
+  assert.match(markdown, /ng wallet_path: ADB wallet path が設定されていません。/);
   assert.match(markdown, /```sql\nSELECT \*\nFROM SALES_AI\.CUSTOMER_CHUNKS\n```/);
   assert.match(markdown, /### SQLcl script preview/);
   assert.match(markdown, /VAR query_text CLOB/);

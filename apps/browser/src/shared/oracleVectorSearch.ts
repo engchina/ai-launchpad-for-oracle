@@ -32,6 +32,11 @@ export type OracleVectorSearchReadinessCheck = {
   status: "ready" | "not-configured" | "invalid" | "unavailable";
   message: string;
   path?: string;
+  checks?: Array<{
+    name: string;
+    ok: boolean;
+    message: string;
+  }>;
 };
 
 export type OracleVectorSearchExecutionPayload = {
@@ -61,6 +66,7 @@ export const defaultOracleVectorSearchConfig: OracleVectorSearchConfig = {
 };
 
 const simpleOracleIdentifierPattern = /^[A-Za-z][A-Za-z0-9_$#]*$/;
+const sqlclConnectionAliasPattern = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 
 const requiredConfigFields: Array<{
   key: keyof Pick<OracleVectorSearchConfig, "connectionName" | "tableName" | "vectorColumn" | "textColumn" | "embeddingModel">;
@@ -89,26 +95,39 @@ function isOracleIdentifierPath(value: string): boolean {
   return value.split(".").every((part) => simpleOracleIdentifierPattern.test(part));
 }
 
-function createIdentifierValidationErrors(config: OracleVectorSearchConfig): string[] {
+function createConfigValidationErrors(config: OracleVectorSearchConfig): string[] {
   const identifiers = [
     { label: "table", value: config.tableName ?? "" },
     { label: "vector column", value: config.vectorColumn ?? "" },
     { label: "text column", value: config.textColumn ?? "" }
   ];
 
-  return identifiers.flatMap(({ label, value }) =>
+  const connectionErrors = sqlclConnectionAliasPattern.test(config.connectionName ?? "")
+    ? []
+    : [
+        "connection は SQLcl connection alias として英数字、_、-、. のみで指定してください。credential、connect descriptor、改行は含めないでください。"
+      ];
+  const identifierErrors = identifiers.flatMap(({ label, value }) =>
     isOracleIdentifierPath(value)
       ? []
       : [`${label} は schema.table または column 形式の Oracle identifier として指定してください。`]
   );
+
+  return [...connectionErrors, ...identifierErrors];
 }
 
 function normalizeSqlclTextLiteral(value: string): string {
   return value.replace(/\s+/g, " ").trim().replace(/'/g, "''");
 }
 
+function normalizeSqlclCommentValue(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 function createSqlclScriptPreview(question: string, config: OracleVectorSearchConfig, sqlPreview: string): string {
   const queryText = normalizeSqlclTextLiteral(question) || "default knowledge question";
+  const connectionName = normalizeSqlclCommentValue(config.connectionName ?? "");
+  const embeddingModel = normalizeSqlclCommentValue(config.embeddingModel ?? "");
 
   return [
     "SET DEFINE OFF",
@@ -116,8 +135,8 @@ function createSqlclScriptPreview(question: string, config: OracleVectorSearchCo
     "SET LINESIZE 200",
     "",
     "-- Oracle Vector Search dry-run execution contract",
-    `-- Connection: ${config.connectionName}`,
-    `-- Embedding model: ${config.embeddingModel}`,
+    `-- Connection: ${connectionName}`,
+    `-- Embedding model: ${embeddingModel}`,
     "-- Generate :query_embedding from :query_text before running the SELECT.",
     "",
     "VAR query_text CLOB",
@@ -175,7 +194,7 @@ export function createOracleVectorSearchPlan(
     };
   }
 
-  const validationErrors = createIdentifierValidationErrors(normalizedConfig);
+  const validationErrors = createConfigValidationErrors(normalizedConfig);
   if (validationErrors.length > 0) {
     return {
       ok: false,

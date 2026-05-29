@@ -73,13 +73,18 @@ function formatOracleVectorExecution(execution: OracleVectorSearchExecutionResul
   }
 
   if (execution.readinessChecks && execution.readinessChecks.length > 0) {
+    const readinessLines = execution.readinessChecks.flatMap((check) => [
+      `- ${check.name}: ${check.status} - ${check.message}${check.path ? ` (${check.path})` : ""}`,
+      ...(check.checks ?? []).map(
+        (detail) => `  - ${detail.ok ? "ok" : "ng"} ${detail.name}: ${detail.message}`
+      )
+    ]);
+
     lines.push(
       "",
       "### Execution readiness",
       "",
-      ...execution.readinessChecks.map((check) =>
-        `- ${check.name}: ${check.status} - ${check.message}${check.path ? ` (${check.path})` : ""}`
-      )
+      ...readinessLines
     );
   }
 
