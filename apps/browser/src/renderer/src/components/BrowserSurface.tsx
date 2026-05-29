@@ -12,14 +12,6 @@ import {
 import { type PageSourceType } from "../../../shared/api";
 import { cn } from "@renderer/lib/utils";
 
-const sourceLabels: Record<PageSourceType, string> = {
-  oracle_docs: "Oracle Docs",
-  oci_console: "OCI Console",
-  livelabs: "LiveLabs",
-  github: "GitHub",
-  other: "Web"
-};
-
 type WebviewEvent = Event & {
   url?: string;
   title?: string;
@@ -32,9 +24,12 @@ type ElectronWebviewElement = HTMLElement & {
   goBack: () => void;
   goForward: () => void;
   reload: () => void;
+  reloadIgnoringCache?: () => void;
   loadURL: (url: string) => void;
   getURL: () => string;
   getTitle: () => string;
+  getZoomFactor?: () => number;
+  setZoomFactor?: (factor: number) => void;
   executeJavaScript: <T>(code: string) => Promise<T>;
   capturePage: () => Promise<{
     toDataURL: () => string;
@@ -45,6 +40,10 @@ export type BrowserSurfaceHandle = {
   goBack: () => void;
   goForward: () => void;
   reload: () => void;
+  forceReload: () => void;
+  resetZoom: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
   getSelectedText: () => Promise<string>;
   getPageMetadata: () => Promise<{ url: string; title: string }>;
   captureScreenshot: () => Promise<string>;
@@ -74,6 +73,23 @@ function safeWebviewCall<T>(fallback: T, action: () => T): T {
   } catch {
     return fallback;
   }
+}
+
+const defaultZoomFactor = 1;
+const zoomFactorStep = 0.2;
+const minZoomFactor = 0.25;
+const maxZoomFactor = 5;
+
+function clampZoomFactor(value: number): number {
+  return Math.min(maxZoomFactor, Math.max(minZoomFactor, value));
+}
+
+function getWebviewZoomFactor(webview: ElectronWebviewElement): number {
+  return safeWebviewCall(defaultZoomFactor, () => webview.getZoomFactor?.() ?? defaultZoomFactor);
+}
+
+function setWebviewZoomFactor(webview: ElectronWebviewElement, zoomFactor: number): void {
+  safeWebviewCall(undefined, () => webview.setZoomFactor?.(clampZoomFactor(zoomFactor)));
 }
 
 function buildMockScreenshotDataUrl(title: string, url: string): string {
@@ -120,6 +136,30 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
           const webview = webviewRef.current;
           if (webview) {
             safeWebviewCall(undefined, () => webview.reload());
+          }
+        },
+        forceReload: () => {
+          const webview = webviewRef.current;
+          if (webview) {
+            safeWebviewCall(undefined, () => (webview.reloadIgnoringCache ? webview.reloadIgnoringCache() : webview.reload()));
+          }
+        },
+        resetZoom: () => {
+          const webview = webviewRef.current;
+          if (webview) {
+            setWebviewZoomFactor(webview, defaultZoomFactor);
+          }
+        },
+        zoomIn: () => {
+          const webview = webviewRef.current;
+          if (webview) {
+            setWebviewZoomFactor(webview, getWebviewZoomFactor(webview) + zoomFactorStep);
+          }
+        },
+        zoomOut: () => {
+          const webview = webviewRef.current;
+          if (webview) {
+            setWebviewZoomFactor(webview, getWebviewZoomFactor(webview) - zoomFactorStep);
           }
         },
         getSelectedText: async () => {
@@ -232,21 +272,11 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
     }, [canUseWebview, currentUrl]);
 
     if (!canUseWebview) {
-      return <MockBrowserViewport currentTitle={currentTitle} currentUrl={currentUrl} sourceType={sourceType} />;
+      return <MockBrowserViewport sourceType={sourceType} />;
     }
 
     return (
-      <article className="overflow-hidden rounded-md border border-border bg-white">
-        <div className="flex items-center justify-between border-b border-border bg-slate-50 px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-950">{currentTitle}</p>
-            <p className="truncate text-xs text-slate-500">{currentUrl}</p>
-          </div>
-          <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-border">
-            {sourceLabels[sourceType]}
-          </span>
-        </div>
-
+      <article className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border bg-white">
         {loadError ? (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{loadError}</div>
         ) : null}
@@ -265,29 +295,11 @@ export const BrowserSurface = forwardRef<BrowserSurfaceHandle, BrowserSurfacePro
 
 BrowserSurface.displayName = "BrowserSurface";
 
-function MockBrowserViewport({
-  currentTitle,
-  currentUrl,
-  sourceType
-}: {
-  currentTitle: string;
-  currentUrl: string;
-  sourceType: PageSourceType;
-}): ReactElement {
+function MockBrowserViewport({ sourceType }: { sourceType: PageSourceType }): ReactElement {
   const isConsole = sourceType === "oci_console";
 
   return (
-    <article className="overflow-hidden rounded-md border border-border bg-white">
-      <div className="flex items-center justify-between border-b border-border bg-slate-50 px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-950">{currentTitle}</p>
-          <p className="truncate text-xs text-slate-500">{currentUrl}</p>
-        </div>
-        <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-border">
-          {sourceLabels[sourceType]}
-        </span>
-      </div>
-
+    <article className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border bg-white">
       <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
         Electron 実行時はこの領域が実ページを読み込む Browser Surface になります。現在の renderer preview では mock 表示です。
       </div>
@@ -299,7 +311,7 @@ function MockBrowserViewport({
 
 function DocsMockPage(): ReactElement {
   return (
-    <div className="grid min-h-[610px] grid-cols-[220px_1fr]">
+    <div className="grid min-h-[610px] flex-1 grid-cols-[220px_1fr] overflow-auto">
       <div className="border-r border-border bg-slate-50 p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Oracle Docs</p>
         {["Overview", "Vector indexes", "Embedding models", "SQL examples", "Troubleshooting"].map((item, index) => (
@@ -354,7 +366,7 @@ function DocsMockPage(): ReactElement {
 
 function ConsoleMockPage(): ReactElement {
   return (
-    <div className="min-h-[610px] bg-slate-950 p-6 text-white">
+    <div className="min-h-[610px] flex-1 overflow-auto bg-slate-950 p-6 text-white">
       <div className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">OCI Console</p>

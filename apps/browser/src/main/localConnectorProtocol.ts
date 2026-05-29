@@ -1,5 +1,7 @@
 import type {
   AdbWalletCheckResult,
+  BrowserMcpLocalConnectorResult,
+  BrowserMcpRequest,
   LocalConnectorHealth,
   GeneratePocAssetsPayload,
   GeneratePocAssetsResult,
@@ -16,6 +18,7 @@ export type LocalConnectorRequestPayloadByType = {
   sqlclCheck: undefined;
   adbWalletCheck: undefined;
   objectStorageCheck: undefined;
+  browserMcpRequest: BrowserMcpRequest;
   generatePocAssets: GeneratePocAssetsPayload;
   oracleVectorSearch: OracleVectorSearchExecutionPayload;
 };
@@ -26,6 +29,7 @@ export type LocalConnectorResponsePayloadByType = {
   sqlclCheck: SqlclCheckResult;
   adbWalletCheck: AdbWalletCheckResult;
   objectStorageCheck: ObjectStorageCheckResult;
+  browserMcpRequest: BrowserMcpLocalConnectorResult;
   generatePocAssets: GeneratePocAssetsResult;
   oracleVectorSearch: OracleVectorSearchExecutionResult;
 };

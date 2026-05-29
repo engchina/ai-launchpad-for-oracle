@@ -1,25 +1,14 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import react from "@vitejs/plugin-react";
 import { createServer } from "vite";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(currentDir, "..");
 
+process.chdir(appRoot);
+
 const server = await createServer({
-  root: resolve(appRoot, "src/renderer"),
-  configFile: false,
-  server: {
-    host: "127.0.0.1",
-    port: 5173,
-    strictPort: false
-  },
-  resolve: {
-    alias: {
-      "@renderer": resolve(appRoot, "src/renderer/src")
-    }
-  },
-  plugins: [react()]
+  configFile: resolve(appRoot, "vite.renderer.config.ts")
 });
 
 await server.listen();

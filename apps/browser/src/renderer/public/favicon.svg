@@ -1,5 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AI Launchpad for Oracle">
-  <rect width="32" height="32" rx="7" fill="#0f172a" />
-  <path d="M8 20.5V11.5H10.2L14.2 17.3V11.5H16.4V20.5H14.2L10.2 14.7V20.5H8Z" fill="#ffffff" />
-  <path d="M18.3 20.5V11.5H24.2V13.3H20.5V15.2H23.7V17H20.5V18.7H24.4V20.5H18.3Z" fill="#f97316" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="AI Launchpad for Oracle Minimal Icon">
+  <defs>
+    <!-- Background Gradient (Rich Charcoal Dark) -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#121214" />
+      <stop offset="100%" stop-color="#1c1c1f" />
+    </linearGradient>
+
+    <!-- Premium Redwood Copper & Terracotta Gradient -->
+    <linearGradient id="redwoodGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8C2D19" />
+      <stop offset="60%" stop-color="#C74B31" />
+      <stop offset="100%" stop-color="#F39C6B" />
+    </linearGradient>
+
+    <!-- Warm Sand Glow Accent -->
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5E8DD" />
+      <stop offset="100%" stop-color="#D9B48F" stop-opacity="0.3" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded Corner Background -->
+  <rect width="128" height="128" rx="32" fill="url(#bgGrad)" />
+
+  <!-- Stylized Elegant "O" Loop that launches upwards -->
+  <g transform="translate(64, 68)">
+    <!-- Glow Underlay -->
+    <path d="M-28 12 C-45 -5, -45 -32, -28 -49 C-11 -66, 16 -66, 33 -49 C46 -36, 48 -18, 38 -4 L48 6 C64 -14, 61 -42, 41 -62 C21 -82, -11 -82, -31 -62 C-51 -42, -51 -14, -31 6 C-17 20, 8 22, 22 10 L12 0 C2 8, -16 6, -28 12 Z"
+          fill="url(#glowGrad)" opacity="0.15" filter="blur(2px)" />
+
+    <!-- Main Interlocking O-Loop & Launch Arrow -->
+    <path d="M-25 15 C-42 0, -42 -28, -25 -45 C-8 -62, 20 -62, 37 -45 C47 -35, 49 -20, 42 -8 L54 4 C66 -13, 62 -38, 45 -55 C28 -72, -2 -72, -20 -55 C-38 -38, -38 -10, -20 8 C-8 20, 12 21, 24 11 L16 3 C7 10, -11 8, -25 15 Z"
+          fill="url(#redwoodGrad)" />
+
+    <!-- Rising Core / Arrow head pointing to top-right (Launch) -->
+    <path d="M28 -49 L46 -49 L46 -31 L40 -37 L24 -21 L16 -29 L32 -45 Z" fill="#F5E8DD" />
+  </g>
 </svg>

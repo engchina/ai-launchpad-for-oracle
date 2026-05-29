@@ -6,6 +6,8 @@ node_modules/
 apps/*/out/
 apps/*/dist/
 dist/
+output/
+test-results/
 
 *.log
 *.tsbuildinfo

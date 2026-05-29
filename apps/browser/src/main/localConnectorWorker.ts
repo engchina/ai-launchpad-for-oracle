@@ -1,4 +1,5 @@
 import type {
+  BrowserMcpRequest,
   GeneratePocAssetsPayload,
   LocalConnectorHealth,
   OracleVectorSearchExecutionPayload,
@@ -6,6 +7,7 @@ import type {
 } from "../shared/api";
 import { executeOracleVectorSearchDryRun } from "../shared/oracleVectorSearch";
 import { checkAdbWallet } from "./adbWalletProbe";
+import { handleLocalConnectorBrowserMcp } from "./localConnectorBrowserMcp";
 import { checkObjectStorage } from "./objectStorageProbe";
 import { checkOciConfig as probeOciConfig } from "./ociConfigProbe";
 import { generatePocAssets } from "./pocAssetGenerator";
@@ -75,6 +77,10 @@ async function handleRequest<T extends LocalConnectorRequestType>(
 
   if (request.type === "objectStorageCheck") {
     return checkObjectStorage() as LocalConnectorResponsePayloadByType[T];
+  }
+
+  if (request.type === "browserMcpRequest" && request.payload) {
+    return handleLocalConnectorBrowserMcp(request.payload as BrowserMcpRequest) as LocalConnectorResponsePayloadByType[T];
   }
 
   if (request.type === "generatePocAssets" && request.payload) {

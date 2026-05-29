@@ -1,0 +1,38 @@
+appId: jp.oracle.ai-launchpad.browser
+productName: AI Launchpad for Oracle
+copyright: Copyright (c) 2026
+asar: true
+directories:
+  output: ../../artifacts/browser-client
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.tsbuildinfo"
+  - "!src/**"
+  - "!scripts/**"
+  - "!*.config.*"
+extraMetadata:
+  name: ai-launchpad-for-oracle-browser
+  main: out/main/index.js
+  description: AI Launchpad for Oracle Browser Client MVP
+win:
+  signAndEditExecutable: false
+  target:
+    - target: zip
+      arch:
+        - x64
+mac:
+  target:
+    - target: zip
+      arch:
+        - x64
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: tar.gz
+      arch:
+        - x64
+  category: Development
+publish: null

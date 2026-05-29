@@ -2,11 +2,16 @@ import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
 import type {
   AskPagePayload,
+  BrowserMcpApprovalDecisionPayload,
+  BrowserMcpEndpointStartPayload,
+  BrowserViewCommand,
+  BrowserSchedulerTaskPayload,
   CapturedPagePayload,
   OracleVectorSearchExecutionPayload,
+  BrowserMcpRequest,
   RagAskResult,
   RagAskPayload,
   SaveScreenshotPayload,
@@ -15,21 +20,99 @@ import type {
 import { ingestTextDocument, MAX_TEXT_DOCUMENT_BYTES } from "../shared/documentIngestion";
 import { answerRagQuestion, createOracleVectorSearchRagAnswer, normalizeRagQuestion } from "../shared/rag";
 import { BrowserWorkspaceService } from "./browserWorkspaceService";
+import { BrowserMcpHttpEndpointController } from "./browserMcpHttpEndpointController";
 import { LocalConnectorProcessClient } from "./localConnectorProcessClient";
 import {
   clearStoredKnowledgeDocuments,
   listStoredKnowledgeDocuments,
   saveKnowledgeDocument
 } from "./localKnowledgeStore";
+import { clearBrowserSchedulerTasks, listBrowserSchedulerTasks, upsertBrowserSchedulerTask } from "./localBrowserSchedulerStore";
 
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
 
 const localConnector = new LocalConnectorProcessClient();
+const browserMcpEndpoint = new BrowserMcpHttpEndpointController({
+  getStoreBaseDir: getLocalStoreBaseDir
+});
 const browserWorkspaceService = new BrowserWorkspaceService(getLocalStoreBaseDir);
 
 function getLocalStoreBaseDir(): string {
   return app.getPath("userData");
+}
+
+function sendBrowserViewCommand(mainWindow: BrowserWindow, command: BrowserViewCommand): void {
+  if (mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send("browser:view-command", command);
+}
+
+function configureApplicationMenu(mainWindow: BrowserWindow): void {
+  const viewMenu: MenuItemConstructorOptions = {
+    label: "View",
+    submenu: [
+      {
+        label: "Reload",
+        accelerator: "CmdOrCtrl+R",
+        click: () => sendBrowserViewCommand(mainWindow, "reload")
+      },
+      {
+        label: "Force Reload",
+        accelerator: "CmdOrCtrl+Shift+R",
+        click: () => sendBrowserViewCommand(mainWindow, "force_reload")
+      },
+      {
+        label: "Toggle Developer Tools",
+        accelerator: "CmdOrCtrl+Shift+I",
+        click: () => mainWindow.webContents.toggleDevTools()
+      },
+      { type: "separator" },
+      {
+        label: "Actual Size",
+        accelerator: "CmdOrCtrl+0",
+        click: () => sendBrowserViewCommand(mainWindow, "reset_zoom")
+      },
+      {
+        label: "Zoom In",
+        accelerator: "CmdOrCtrl+Plus",
+        click: () => sendBrowserViewCommand(mainWindow, "zoom_in")
+      },
+      {
+        label: "Zoom Out",
+        accelerator: "CmdOrCtrl+-",
+        click: () => sendBrowserViewCommand(mainWindow, "zoom_out")
+      },
+      { type: "separator" },
+      {
+        label: "Toggle Full Screen",
+        accelerator: "F11",
+        click: () => mainWindow.setFullScreen(!mainWindow.isFullScreen())
+      }
+    ]
+  };
+  const template: MenuItemConstructorOptions[] = [
+    ...(process.platform === "darwin" ? [{ role: "appMenu" } satisfies MenuItemConstructorOptions] : []),
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    viewMenu,
+    { role: "windowMenu" },
+    {
+      label: "Help",
+      submenu: [
+        {
+          label: "Oracle AI",
+          click: () => {
+            void shell.openExternal("https://www.oracle.com/artificial-intelligence/");
+          }
+        }
+      ]
+    }
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function createWindow(): void {
@@ -40,6 +123,7 @@ function createWindow(): void {
     minHeight: 720,
     show: false,
     title: "AI Launchpad for Oracle",
+    icon: join(__dirname, "../renderer/app-icon.png"),
     backgroundColor: "#F8FAFC",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -65,6 +149,8 @@ function createWindow(): void {
     webPreferences.contextIsolation = true;
     webPreferences.sandbox = true;
   });
+
+  configureApplicationMenu(mainWindow);
 
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -195,6 +281,42 @@ app.whenReady().then(() => {
 
   ipcMain.handle("local-connector:object-storage-check", () => localConnector.objectStorageCheck());
 
+  ipcMain.handle("local-connector:browser-mcp-request", (_, payload: BrowserMcpRequest) => localConnector.browserMcpRequest(payload));
+
+  ipcMain.handle("browser-mcp-endpoint:status", () => browserMcpEndpoint.status());
+
+  ipcMain.handle("browser-mcp-endpoint:start", (_, payload?: BrowserMcpEndpointStartPayload) => browserMcpEndpoint.start(payload));
+
+  ipcMain.handle("browser-mcp-endpoint:stop", () => browserMcpEndpoint.stop());
+
+  ipcMain.handle("browser-mcp-endpoint:audit-events", () => browserMcpEndpoint.listAuditEvents());
+
+  ipcMain.handle("browser-mcp-endpoint:clear-audit-events", () => browserMcpEndpoint.clearAuditEvents());
+
+  ipcMain.handle("browser-mcp-endpoint:approval-decisions", () => browserMcpEndpoint.listApprovalDecisions());
+
+  ipcMain.handle("browser-mcp-endpoint:save-approval-decision", (_, payload: BrowserMcpApprovalDecisionPayload) =>
+    browserMcpEndpoint.saveApprovalDecision(payload)
+  );
+
+  ipcMain.handle("browser-mcp-endpoint:clear-approval-decisions", () => browserMcpEndpoint.clearApprovalDecisions());
+
+  ipcMain.handle("scheduler-registry:list-tasks", async () => ({
+    tasks: await listBrowserSchedulerTasks(getLocalStoreBaseDir())
+  }));
+
+  ipcMain.handle("scheduler-registry:save-task", async (_, payload: BrowserSchedulerTaskPayload) => ({
+    task: await upsertBrowserSchedulerTask(getLocalStoreBaseDir(), payload)
+  }));
+
+  ipcMain.handle("scheduler-registry:clear-tasks", async () => {
+    await clearBrowserSchedulerTasks(getLocalStoreBaseDir());
+    return {
+      ok: true,
+      clearedAt: new Date().toISOString()
+    };
+  });
+
   ipcMain.handle("local-connector:generate-poc-assets", (_, payload) => localConnector.generatePocAssets(payload));
 
   ipcMain.handle("local-connector:oracle-vector-search", (_, payload: OracleVectorSearchExecutionPayload) =>
@@ -212,6 +334,7 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   localConnector.dispose();
+  void browserMcpEndpoint.dispose();
 });
 
 app.on("window-all-closed", () => {
