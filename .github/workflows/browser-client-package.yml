@@ -17,6 +17,12 @@ jobs:
   package:
     name: Package ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      # electron / electron-builder のダウンロード成果物を job 内の固定パスに集約し、
+      # OS を問わず actions/cache で再利用できるようにする。
+      ELECTRON_CACHE: ${{ github.workspace }}/.electron-cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.electron-cache/electron-builder
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +44,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Validate release tag version
         if: startsWith(github.ref, 'refs/tags/browser-client-v')
@@ -63,6 +71,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Cache electron downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.electron-cache
+          key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -116,6 +132,7 @@ jobs:
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: package
     if: startsWith(github.ref, 'refs/tags/browser-client-v')
     permissions:
@@ -149,7 +166,12 @@ jobs:
           NOTES
 
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --title "AI Launchpad Browser Client ${RELEASE_TAG}" --notes-file "$notes_file"
+            # 静的な注意書きをヘッダにし、前回 tag 以降の PR / コミットから
+            # 変更履歴を自動生成して追記する (--generate-notes)。
+            gh release create "$RELEASE_TAG" \
+              --title "AI Launchpad Browser Client ${RELEASE_TAG}" \
+              --notes-file "$notes_file" \
+              --generate-notes
           fi
 
           mapfile -d '' assets < <(find release-assets -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) -print0 | sort -z)

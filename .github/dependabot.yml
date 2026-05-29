@@ -1,0 +1,31 @@
+# Dependabot 設定: 依存パッケージと GitHub Actions の更新を週次で監視する。
+# pnpm-lock.yaml はリポジトリ直下にあるため、npm ecosystem を "/" に設定する。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      # 開発依存はまとめて 1 つの PR にし、レビュー負荷を抑える。
+      dev-dependencies:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope

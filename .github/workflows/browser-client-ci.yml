@@ -27,9 +27,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  browser-client:
-    name: Browser Client checks
+  checks:
+    # 静的チェックを task 単位の並列 job に分割し、失敗の切り分けを速くする。
+    # fail-fast: false で全 task の結果をまとめて確認できるようにする。
+    name: ${{ matrix.task }}
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - typecheck
+          - lint
+          - test:knowledge
     defaults:
       run:
         shell: bash
@@ -37,6 +47,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -53,14 +65,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm --filter @ai-launchpad/browser typecheck
+      - name: Run ${{ matrix.task }}
+        run: pnpm --filter @ai-launchpad/browser ${{ matrix.task }}
 
-      - name: Lint
-        run: pnpm --filter @ai-launchpad/browser lint
+  build:
+    name: Build Electron app
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
 
-      - name: Test knowledge contracts
-        run: pnpm --filter @ai-launchpad/browser test:knowledge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build Electron app
         run: pnpm --filter @ai-launchpad/browser build
